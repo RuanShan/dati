@@ -1,0 +1,23 @@
+{
+  "name": "dati",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "selenium-webdriver": "^4.0.0-alpha.4"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RuanShan/dati.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/RuanShan/dati/issues"
+  },
+  "homepage": "https://github.com/RuanShan/dati#readme"
+}
