@@ -8,4 +8,5 @@ coverage/
 .env*
 .coveralls.yml
 yarn-error.log
+package-lock.json
 log/
