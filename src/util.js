@@ -1,4 +1,4 @@
-export function scrollToBottom( driver ){
+function scrollToBottom( driver ){
 
   // let script = "var h=document.body.scrollHeight; window.scrollTo(0,document.body.scrollHeight)"
   // 每秒500px
@@ -6,7 +6,7 @@ export function scrollToBottom( driver ){
   driver.executeScript(script)
 }
 
-export function scrollToCenter( driver ){
+function scrollToCenter( driver ){
   // let script = "var h=document.body.scrollHeight; window.scrollTo(0,document.body.scrollHeight)"
   // 每秒500px
   let script = 'var timespan = Math.ceil(document.body.scrollHeight/500)*1000; $("html,body").animate({scrollTop: document.body.scrollHeight + "px"}, timespan);'
@@ -15,16 +15,24 @@ export function scrollToCenter( driver ){
 
 
 // (webElement) video
-export function playVideo( video ){
+async function playVideo( video,canvas ){
 
-  let duration = video.getAttribute('duration')
+  let duration = await video.getAttribute('duration')
+  console.log('duration----:',duration);
   // setTimeout
-  video.click()
-  let id = setTimeout( playVideoTimeout , duration*1000, video );
+  await canvas.click()
+  let id = await setTimeout( playVideoTimeout ,1000000*1000, video );
 
 }
 
 
 function playVideoTimeout( video ){
   console.log( "video is over")
+}
+
+
+module.exports = {
+  scrollToBottom,
+  scrollToCenter,
+  playVideo
 }

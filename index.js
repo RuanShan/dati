@@ -1,9 +1,15 @@
+// import util from './src/util.js'
+const {
+  scrollToBottom,
+  playVideo
+} = require('./src/util.js');
 const {
   Builder,
   By,
   Key,
   until
 } = require('selenium-webdriver');
+
 
 (async function example() {
   let driver = await new Builder().forBrowser('chrome').build();
@@ -16,7 +22,6 @@ const {
     await driver.wait(until.titleIs('学生空间'), 1000000);
     await driver.findElement(By.className('jbox-close')).click();
     console.log('Login Success!!!');
-
     handleCouseLinks(driver)
 
   } finally {
@@ -92,47 +97,74 @@ async function handleCouseMaoGai(driver) {
   console.log(`毛泽东思想和中国特色社会主义理论体系概论  ${progress}`)
 
   let incompleted = []
-
-  for (let i = 0; i < levelOne.length; i++) {
-    let a = levelOne[i]
-    let text = await a.getText()
-    let id = await a.getAttribute('id')
-    console.log(`levelOne.text ${i} ${id} ${text}`)
-
-    // li.activity url modtype_url| activity page modtype_page
-    let levelTwo = await a.findElements(By.css(sectionl2Css))
-    let b = levelTwo[0]
-    let isDisplayed = await b.isDisplayed()
-    if (!isDisplayed) {
-      // 显示下级内容
-      a.click()
-    }
-
-    for (let j = 0; j < levelTwo.length; j++) {
-      let b = levelTwo[j]
-      let text = await b.getText()
-      let id = await b.getAttribute('id')
-      let link = await b.findElement(By.css(sectionl2LinkCss))
-      let href = await link.getAttribute('href')
-      let img = await b.findElements(By.tagName('img'))
-      let alt = await img[1].getAttribute('alt')
-      if (alt.startsWith("未完成")) {
-        console.log(`levelTwo.text ${j} ${id} ${text} ${href} ${alt}`)
-        incompleted.push({
-          href
-        })
-      }
-    }
-
-  }
+  let status = []
+  status.push('progress---:' + progress)
+  // for (let i = 0; i < levelOne.length; i++) {
+  //   let a = levelOne[i]
+  //   let text = await a.getText()
+  //   let id = await a.getAttribute('id')
+  //   console.log(`levelOne.text ${i} ${id} ${text}`)
+  //   status.push('\n=======================' + text + '=======================')
+  //   // li.activity url modtype_url| activity page modtype_page
+  //   let levelTwo = await a.findElements(By.css(sectionl2Css))
+  //   let b = levelTwo[0]
+  //   let isDisplayed = await b.isDisplayed()
+  //   if (!isDisplayed) {
+  //     // 显示下级内容
+  //     a.click()
+  //   }
+  //
+  //   for (let j = 0; j < levelTwo.length; j++) {
+  //     let b = levelTwo[j]
+  //     let text = await b.getText()
+  //     let id = await b.getAttribute('id')
+  //     let link = await b.findElement(By.css(sectionl2LinkCss))
+  //     let href = await link.getAttribute('href')
+  //     let img = await b.findElements(By.tagName('img'))
+  //     let alt = await img[1].getAttribute('alt')
+  //     let log = '\ncourse----:' + text + ', status---:' + alt.substring(0, 3)
+  //     status.push(log)
+  //     if (alt.startsWith("未完成")) {
+  //       console.log(`levelTwo.text ${j} ${id} ${text} ${href} ${alt}`)
+  //       // incompleted.push({
+  //       //   text,
+  //       //   href
+  //       // })
+  //     }
+  //   }
+  //
+  // // }
+  incompleted.push({
+    text:'视频1：一代伟人走向马克思主义 网页地址',
+    href:'http://liaoning.ouchn.cn/mod/url/view.php?id=464729'
+  })
+  const fs = require('fs');
+  fs.writeFile('./log.json', status, (err) => {
+    if (err) throw err;
+    console.log('文件已被保存');
+  });
 
   console.log("incompleted= ", incompleted)
-  for (let k = 0; k < incompleted.length; k++) {
+  for (let k = 0; k < incompleted.length; ) {
     let work = incompleted[k]
     let href = work.href
-    await driver.get(href);
+    if (!href.includes('resource')) {
+      await driver.get(href);
+    }
     let title = await driver.getTitle()
-    console.log("title1= ", title);
+    console.log("title============== ", title);
+    if (work.text.includes('视频')) {
+      console.log('this is a video');
+      let video = await driver.findElement(By.tagName('video'))
+      let canvas = await driver.findElement(By.tagName('canvas'))
+      console.log('video----:',video);
+      await playVideo(video,canvas).then(data=>{
+        k++;
+      })
+    } else {
+      console.log('this is a txt');
+      await scrollToBottom(driver)
+    }
 
   }
   await driver.get(url)
