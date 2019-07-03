@@ -129,13 +129,18 @@ async function handleCouse( driver ){
 }
 
 async function handleCouseMaoGai( driver ){
-  //let sectionPath =  "//ul[@class='flexsections-level-1']/li"
+  let progressPath =  "//div[@class='progress-bar']/span"
   let sectionl1Path =  "//ul[@class='flexsections flexsections-level-1']/li"
   let sectionl2Path =  "//ul[@class='flexsections flexsections-level-2']/li"
   let sectionl2Css =  "li.activity"
+  let sectionl2LinkCss =  "a"
 
 
   let levelOne = await driver.findElements(By.xpath(sectionl1Path))
+  let progressContainer = await driver.findElement(By.xpath(progressPath))
+  let progress = await progressContainer.getText()
+  console.log(`毛泽东思想和中国特色社会主义理论体系概论  ${progress}` )
+
 
   for(let i=0;i< levelOne.length; i++){
     let a = levelOne[i]
@@ -155,6 +160,9 @@ async function handleCouseMaoGai( driver ){
       let b = levelTwo[j]
       let text = await b.getText()
       let id =  await b.getAttribute('id')
+      let link = await b.findElement(By.css(sectionl2LinkCss))
+
+      let id =  await b.getAttribute('a')
       console.log( `levelTwo.text ${j} ${id} ${text}` )
     }
 
