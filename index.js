@@ -48,32 +48,41 @@ async function getCousesLinks( driver ){
   // text = 进入课程
   let div = await driver.findElement(By.id('LearningCourseDiv'));
   let links = await div.findElements(By.linkText('进入课程'));
+  links.forEach(async (a)=>{
+    await a.click()
+    // generate a.href
+  })
   // let lis = await div.findElements(By.tagName('li'));
   // lis.forEach(async (a)=>{
   //   let text = await a.getText()
   //   console.log( " couse.link ", text )
   // })
-  // let hrefs = links.map(async (a)=>{
-  //   return await a.getAttribute( 'href')
-  // })
+
 
   return links
 
 }
 
 async function handleCouseLinks( driver ){
-  let links = await getCousesLinks( driver );
+  let mainHandle = await driver.getWindowHandle()
 
-   await links[5].click()
-   console.log('title--:',await driver.getTitle());
-   await handleCouse( driver )
-   let mainHandle = await driver.getWindowHandle()
+
+  let links = await getCousesLinks( driver );
+  let promises = links.map(async (a)=>{
+      return await a.getAttribute( 'href')
+  })
+
+  let hrefs = await Promise.all( promises )
+  console.log('all tab opened, hrefs',hrefs);
+
+   // console.log('title--:',await driver.getTitle());
+   // await handleCouse( driver )
    let handles = await  driver.getAllWindowHandles()
    console.log("getAllWindowHandles", handles )
 
    // let a = await driver.findElements(By.xpath("//li[contains(@class,‘section’)]"));
-   let a = await driver.findElements(By.xpath("//*[@class='course-content']"));
-   console.log('a-----:',a.length);
+   //let a = await driver.findElements(By.xpath("//*[@class='course-content']"));
+   //console.log('a-----:',a.length);
 
   // links.forEach(async (link)=>{
   //   console.log( "click link0")
@@ -82,16 +91,24 @@ async function handleCouseLinks( driver ){
   // })
   // let currentUrl = await driver.getCurrentUrl()
   // let url = links[0]
-  // driver.navigate.to( url )
+  // driver.get( url )
   // await driver.wait(until.urlIs(url), 10000);
-  //
 
-  //
-  //
+
+  for(let i=0;i< handles.length; i++){
+    let handle = handles[i]
+    console.log("mainHandle", mainHandle, "handle = ", handle )
+    if( mainHandle != handle ){
+      let locator = driver.switchTo()
+      await locator.window(handle)
+      await handleCouse(driver)
+    }
+  }
   // handles.forEach(async (handle)=>{
   //   console.log("mainHandle", mainHandle, "handle = ", handle )
   //   if( mainHandle != handle ){
-  //     await driver.switchTo().window(handle)
+  //     let locator = driver.switchTo()
+  //     await locator.window(handle)
   //     await handleCouse(driver)
   //   }
   // })
@@ -100,8 +117,50 @@ async function handleCouseLinks( driver ){
 }
 
 async function handleCouse( driver ){
+  // 毛泽东思想和中国特色社会主义理论体系概论, 统计学原理   思想道德修养与法律基础  管理学基础
+  //  经济数学基础  计算机应用基础
+
   console.log( " tab.title0 " )
   let title = await driver.getTitle()
   console.log( " tab.title1 ", title )
+  if( title.search('毛泽东思想和中国特色社会主义理论体系概论') >=0 ){
+    await handleCouseMaoGai( driver )
+  }
+}
+
+async function handleCouseMaoGai( driver ){
+  //let sectionPath =  "//ul[@class='flexsections-level-1']/li"
+  let sectionl1Path =  "//ul[@class='flexsections flexsections-level-1']/li"
+  let sectionl2Path =  "//ul[@class='flexsections flexsections-level-2']/li"
+  let sectionl2Css =  "li.activity"
+
+
+  let levelOne = await driver.findElements(By.xpath(sectionl1Path))
+
+  for(let i=0;i< levelOne.length; i++){
+    let a = levelOne[i]
+    let text = await a.getText()
+    let id =  await a.getAttribute('id')
+    console.log(`levelOne.text ${i} ${id} ${text}` )
+
+    // li.activity url modtype_url| activity page modtype_page
+    let levelTwo = await a.findElements(By.css(sectionl2Css))
+    let b = levelTwo[0]
+    let isDisplayed = await b.isDisplayed()
+    if( !isDisplayed){
+      // 显示下级内容
+      a.click()
+    }
+    for(let j=0;j< levelTwo.length; j++){
+      let b = levelTwo[j]
+      let text = await b.getText()
+      let id =  await b.getAttribute('id')
+      console.log( `levelTwo.text ${j} ${id} ${text}` )
+    }
+
+  }
+
+
+  console.log( " handleCouseMaoGai "  )
 
 }
