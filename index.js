@@ -98,54 +98,64 @@ async function handleCouseMaoGai(driver) {
 
   let incompleted = []
   let status = []
-  status.push('progress---:' + progress)
-  // for (let i = 0; i < levelOne.length; i++) {
-  //   let a = levelOne[i]
-  //   let text = await a.getText()
-  //   let id = await a.getAttribute('id')
-  //   console.log(`levelOne.text ${i} ${id} ${text}`)
-  //   status.push('\n=======================' + text + '=======================')
-  //   // li.activity url modtype_url| activity page modtype_page
-  //   let levelTwo = await a.findElements(By.css(sectionl2Css))
-  //   let b = levelTwo[0]
-  //   let isDisplayed = await b.isDisplayed()
-  //   if (!isDisplayed) {
-  //     // 显示下级内容
-  //     a.click()
-  //   }
-  //
-  //   for (let j = 0; j < levelTwo.length; j++) {
-  //     let b = levelTwo[j]
-  //     let text = await b.getText()
-  //     let id = await b.getAttribute('id')
-  //     let link = await b.findElement(By.css(sectionl2LinkCss))
-  //     let href = await link.getAttribute('href')
-  //     let img = await b.findElements(By.tagName('img'))
-  //     let alt = await img[1].getAttribute('alt')
-  //     let log = '\ncourse----:' + text + ', status---:' + alt.substring(0, 3)
-  //     status.push(log)
-  //     if (alt.startsWith("未完成")) {
-  //       console.log(`levelTwo.text ${j} ${id} ${text} ${href} ${alt}`)
-  //       // incompleted.push({
-  //       //   text,
-  //       //   href
-  //       // })
-  //     }
-  //   }
-  //
-  // // }
-  incompleted.push({
-    text:'视频1：一代伟人走向马克思主义 网页地址',
-    href:'http://liaoning.ouchn.cn/mod/url/view.php?id=464729'
-  })
+  let score = {
+    progress:progress
+  }
+  for (let i = 0; i < levelOne.length; i++) {
+    let a = levelOne[i]
+    let text = await a.getText()
+    let id = await a.getAttribute('id')
+    console.log(`levelOne.text ${i} ${id} ${text}`)
+    // li.activity url modtype_url| activity page modtype_page
+    let levelTwo = await a.findElements(By.css(sectionl2Css))
+    let b = levelTwo[0]
+    let isDisplayed = await b.isDisplayed()
+    if (!isDisplayed) {
+      // 显示下级内容
+      a.click()
+    }
+
+    for (let j = 0; j < levelTwo.length; j++) {
+      let b = levelTwo[j]
+      let text = await b.getText()
+      let id = await b.getAttribute('id')
+      let link = await b.findElement(By.css(sectionl2LinkCss))
+      let href = await link.getAttribute('href')
+      let img = await b.findElements(By.tagName('img'))
+      let alt = await img[1].getAttribute('alt')
+      let course = {
+        title:text,
+        isFinish:alt.substring(0, 3),
+        url:href
+      }
+      status.push(course)
+      if (alt.startsWith("未完成")) {
+        console.log(`levelTwo.text ${j} ${id} ${text} ${href} ${alt}`)
+        // incompleted.push({
+        //   text,
+        //   href
+        // })
+      }
+    }
+
+  }
+  // incompleted.push({
+  //   text: '视频1：一代伟人走向马克思主义 网页地址',
+  //   href: 'http://liaoning.ouchn.cn/mod/url/view.php?id=464729'
+  // })
+  let json = {
+    score:score,
+    status:status
+  }
+  console.log('json=====:',json);
   const fs = require('fs');
-  fs.writeFile('./log.json', status, (err) => {
+  fs.writeFile('./log.json', JSON.stringify(json), (err) => {
     if (err) throw err;
     console.log('文件已被保存');
   });
 
   console.log("incompleted= ", incompleted)
-  for (let k = 0; k < incompleted.length; ) {
+  for (let k = 0; k < incompleted.length; k++) {
     let work = incompleted[k]
     let href = work.href
     if (!href.includes('resource')) {
@@ -154,13 +164,17 @@ async function handleCouseMaoGai(driver) {
     let title = await driver.getTitle()
     console.log("title============== ", title);
     if (work.text.includes('视频')) {
-      console.log('this is a video');
-      let video = await driver.findElement(By.tagName('video'))
+      // let isFinish = false
+
+
       let canvas = await driver.findElement(By.tagName('canvas'))
-      console.log('video----:',video);
-      await playVideo(video,canvas).then(data=>{
-        k++;
-      })
+
+      // await playVideo(video,canvas).then(data=>{
+      //   isFinish = true
+      // })
+      await driver.wait(playVideo(driver, canvas), 100000000);
+      console.log('this video is done');
+
     } else {
       console.log('this is a txt');
       await scrollToBottom(driver)
