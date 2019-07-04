@@ -22,9 +22,9 @@ const {
 
   try {
     await driver.get('http://sso.ouchn.cn/Passport/Login?ru=http%3a%2f%2fshome.ouchn.cn%2f&to=-2&aid=6&ip=100.125.68.16&lou=http%3a%2f%2fshome.ouchn.cn%2f6%2fMCSAuthenticateLogOff.axd&sf=4968909290f6c894');
-    await driver.findElement(By.id('username')).sendKeys('1821001453342');
+      await driver.findElement(By.id('username')).sendKeys('1821001453342');
     await driver.findElement(By.id('password')).sendKeys('19830526');
-    // await handleVerifyCode(driver)
+    await handleVerifyCode(driver)
     await driver.wait(until.titleIs('学生空间'), 1000000);
     await driver.findElement(By.className('jbox-close')).click();
     console.log('Login Success!!!');
@@ -83,7 +83,8 @@ async function handleCouse(driver) {
   console.log(" tab.title0 ")
   let title = await driver.getTitle()
   console.log(" tab.title1 ", title)
-  if (title.search('毛泽东思想和中国特色社会主义理论体系概论') >= 0) {
+  console.log('毛泽东思想和中国特色社会主义理论体系概论',title.includes('毛泽东思想'));
+  if (title.includes('毛泽东思想')) {
     await handleCouseMaoGai(driver)
   }
 }
@@ -204,8 +205,8 @@ async function readText(driver) {
   let res = null;
   fs.readFile("./log.json", "utf-8", function(error, data) {
     if (error) return console.log(error.message);
-    console.log("data----:" + data);
     res = JSON.parse(data);
+    console.log("res----:" + res);
   });
   if (res != null) {
     let score = res.score;

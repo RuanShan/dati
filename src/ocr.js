@@ -14,8 +14,9 @@ async function getVerifyCode( driver ){
   const encoded = await driver.takeScreenshot()
   let buffer = new Buffer.from(encoded, 'base64');
   //let binaryString = buff.toString('binary');
-  let codeBuffer = await sharp(buffer).extract({ width: rect.width, height: rect.height, left: parseInt(rect.x), top: parseInt(rect.y) }).toBuffer()
-  let code = await Tesseract.recognize(codeBuffer)
+let codeBuffer = await sharp(buffer).extract({ width: rect.width, height: rect.height, left: parseInt(rect.x), top: parseInt(rect.y) }).toBuffer()
+
+  let code = await Tesseract.recognize(codeBuffer, {tessedit_char_whitelist: '0123456789', tessedit_create_hocr: '0', tessedit_create_tsv: '0' })
   return code
 }
 
