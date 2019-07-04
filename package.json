@@ -5,11 +5,20 @@
   "main": "index.js",
   "dependencies": {
     "debugout.js": "^0.5.0",
-    "selenium-webdriver": "^4.0.0-alpha.4"
+    "selenium-webdriver": "^4.0.0-alpha.4",
+    "sharp": "^0.22.1",
+    "tesseract.js": "^1.0.19"
   },
   "devDependencies": {},
   "scripts": {
     "test": "test"
+  },
+  "bin": {
+    "dati": "./index.js"
+  },
+  "pkg": {
+    "scripts": "node_modules/selenium-webdriver/lib/atoms/**/*.js",
+    "assets": "views/**/*"
   },
   "repository": {
     "type": "git",
