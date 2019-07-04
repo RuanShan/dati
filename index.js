@@ -22,16 +22,16 @@ const {
 
   try {
     await driver.get('http://sso.ouchn.cn/Passport/Login?ru=http%3a%2f%2fshome.ouchn.cn%2f&to=-2&aid=6&ip=100.125.68.16&lou=http%3a%2f%2fshome.ouchn.cn%2f6%2fMCSAuthenticateLogOff.axd&sf=4968909290f6c894');
-      await driver.findElement(By.id('username')).sendKeys('1821001453342');
-    await driver.findElement(By.id('password')).sendKeys('19830526');
-    await handleVerifyCode(driver)
+    await driver.findElement(By.id('username')).sendKeys('1821001452683');
+    await driver.findElement(By.id('password')).sendKeys('19771229');
+    // await handleVerifyCode(driver)
     await driver.wait(until.titleIs('学生空间'), 1000000);
     await driver.findElement(By.className('jbox-close')).click();
     console.log('Login Success!!!');
     await handleCouseLinks(driver)
 
   } finally {
-    await driver.quit();
+    // await driver.quit();
   }
 })();
 
@@ -83,10 +83,10 @@ async function handleCouse(driver) {
   console.log(" tab.title0 ")
   let title = await driver.getTitle()
   console.log(" tab.title1 ", title)
-  console.log('毛泽东思想和中国特色社会主义理论体系概论',title.includes('毛泽东思想'));
-  if (title.includes('毛泽东思想')) {
-    await handleCouseMaoGai(driver)
-  }
+  console.log('毛泽东思想和中国特色社会主义理论体系概论', title.includes('毛泽东思想'));
+  // if (title.includes('毛泽东思想')) {
+  await handleCouseMaoGai(driver)
+  // }
 }
 
 async function handleCouseMaoGai(driver) {
@@ -108,58 +108,58 @@ async function handleCouseMaoGai(driver) {
   let score = {
     progress: progress
   }
-  for (let i = 0; i < levelOne.length; i++) {
-    let a = levelOne[i]
-    let text = await a.getText()
-    let id = await a.getAttribute('id')
-    console.log(`levelOne.text ${i} ${id} ${text}`)
-    // li.activity url modtype_url| activity page modtype_page
-    let levelTwo = await a.findElements(By.css(sectionl2Css))
-    let b = levelTwo[0]
-    let isDisplayed = await b.isDisplayed()
-    if (!isDisplayed) {
-      // 显示下级内容
-      a.click()
-    }
-
-    for (let j = 0; j < levelTwo.length; j++) {
-      let b = levelTwo[j]
-      let text = await b.getText()
-      let id = await b.getAttribute('id')
-      let link = await b.findElement(By.css(sectionl2LinkCss))
-      let href = await link.getAttribute('href')
-      let img = await b.findElements(By.tagName('img'))
-      let alt = await img[1].getAttribute('alt')
-      let course = {
-        title: text,
-        isFinish: alt.substring(0, 3),
-        url: href
-      }
-      status.push(course)
-      if (alt.startsWith("未完成")) {
-        console.log(`levelTwo.text ${j} ${id} ${text} ${href} ${alt}`)
-        // incompleted.push({
-        //   text,
-        //   href
-        // })
-      }
-    }
-
-  }
+  // for (let i = 0; i < levelOne.length; i++) {
+  //   let a = levelOne[i]
+  //   let text = await a.getText()
+  //   let id = await a.getAttribute('id')
+  //   console.log(`levelOne.text ${i} ${id} ${text}`)
+  //   // li.activity url modtype_url| activity page modtype_page
+  //   let levelTwo = await a.findElements(By.css(sectionl2Css))
+  //   let b = levelTwo[0]
+  //   let isDisplayed = await b.isDisplayed()
+  //   if (!isDisplayed) {
+  //     // 显示下级内容
+  //     a.click()
+  //   }
+  //
+  //   for (let j = 0; j < levelTwo.length; j++) {
+  //     let b = levelTwo[j]
+  //     let text = await b.getText()
+  //     let id = await b.getAttribute('id')
+  //     let link = await b.findElement(By.css(sectionl2LinkCss))
+  //     let href = await link.getAttribute('href')
+  //     let img = await b.findElements(By.tagName('img'))
+  //     let alt = await img[1].getAttribute('alt')
+  //     let course = {
+  //       title: text,
+  //       isFinish: alt.substring(0, 3),
+  //       url: href
+  //     }
+  //     status.push(course)
+  //     if (alt.startsWith("未完成")) {
+  //       console.log(`levelTwo.text ${j} ${id} ${text} ${href} ${alt}`)
+  //       // incompleted.push({
+  //       //   text,
+  //       //   href
+  //       // })
+  //     }
+  //   }
+  //
+  // }
   incompleted.push({
     text: '视频1：一代伟人走向马克思主义 网页地址',
     href: 'http://liaoning.ouchn.cn/mod/url/view.php?id=464729'
   })
-  let json = {
-    score: score,
-    status: status
-  }
-  console.log('json=====:', json);
-  const fs = require('fs');
-  fs.writeFile('./log.json', JSON.stringify(json), (err) => {
-    if (err) throw err;
-    console.log('文件已被保存');
-  });
+  // let json = {
+  //   score: score,
+  //   status: status
+  // }
+  // console.log('json=====:', json);
+  // const fs = require('fs');
+  // fs.writeFile('./log.json', JSON.stringify(json), (err) => {
+  //   if (err) throw err;
+  //   console.log('文件已被保存');
+  // });
   console.log("incompleted= ", incompleted)
   // for (let k = 0; k < incompleted.length; k++) {
   //   let work = incompleted[k]
@@ -187,7 +187,8 @@ async function handleCouseMaoGai(driver) {
   //   }
   //
   // }
-  readText(driver)
+  // readText(driver)
+  watchVideo(driver)
   await driver.get(url)
   title = await driver.getTitle()
   console.log(" title2= ", title);
@@ -202,35 +203,37 @@ async function handleCouseMaoGai(driver) {
 async function readText(driver) {
   console.log('==================readText=================');
   const fs = require('fs');
-  let res = null;
-  fs.readFile("./log.json", "utf-8", function(error, data) {
+
+  await fs.readFile("./log.json", "utf-8", async function(error, data) {
     if (error) return console.log(error.message);
-    res = JSON.parse(data);
+    var res = JSON.parse(data);
     console.log("res----:" + res);
-  });
-  if (res != null) {
-    let score = res.score;
-    let status = res.status;
-    console.log('status----:',status.length);
+    if (res != null) {
+      let score = res.score;
+      let status = res.status;
+      console.log('status----:', status.length);
 
-    for (let i = 0; i < status.length; i++) {
-      let course = status[i];
-      let isFinish = course.isFinish;
+      for (let i = 0; i < status.length; i++) {
+        let course = status[i];
+        console.log('course--:', course);
+        let isFinish = course.isFinish;
 
-      if (isFinish == '未完成') {
-        let url = course.url
-        let title = course.title
-        if (!url.includes('resource') && !title.includes('视频')) {
-          await driver.get(url);
+        if (isFinish == '未完成') {
+          let url = course.url
+          let title = course.title
+          if (!url.includes('resource') && !title.includes('视频')) {
+            await driver.get(url);
+            console.log('reading ', title);
+            await scrollToBottom(driver)
+            console.log('read finish', title);
+          }
         }
-        console.log('reading ', title);
-        await scrollToBottom(driver)
-        console.log('read finish', title);
       }
+    } else {
+      console.log('can not read log.json');
     }
-  } else {
-    console.log('can not read log.json');
-  }
+  })
+
 }
 
 
@@ -254,12 +257,12 @@ async function watchVideo(driver) {
 
       if (isFinish == '未完成' && title.includes('视频')) {
         let url = course.url
-        if (!url.includes('resource')) {
+        if (!url.includes('resource')&& title.includes('视频')) {
           await driver.get(url);
+          let canvas = await driver.findElement(By.tagName('canvas'))
+          await driver.wait(playVideo(driver, canvas), 100000000);
+          console.log('this video is done');
         }
-        let canvas = await driver.findElement(By.tagName('canvas'))
-        await driver.wait(playVideo(driver, canvas), 100000000);
-        console.log('this video is done');
       }
     }
   } else {
