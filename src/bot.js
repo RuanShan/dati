@@ -19,10 +19,11 @@ function learnVideo( driver ){
 async function handleVerifyCode( driver ){
 
   let code  = await getVerifyCode( driver )
-  let text = code.text.replace('\n', '')
-  console.log( "code = ", code )
-  await driver.findElement(By.id('checkCode')).sendKeys('text');
+  let text = /[\w]+/.exec(code.text).toString()
+  console.log( "text=", text )
+  await driver.findElement(By.id('checkCode')).sendKeys( text );
   await driver.findElement(By.id('btnLogin')).click()
+
 }
 
 
