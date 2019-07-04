@@ -3,6 +3,11 @@ const {
   scrollToBottom,
   playVideo
 } = require('./src/util.js');
+
+const {
+  handleVerifyCode
+} = require('./src/bot.js');
+
 const {
   Builder,
   By,
@@ -19,13 +24,14 @@ const {
     await driver.get('http://sso.ouchn.cn/Passport/Login?ru=http%3a%2f%2fshome.ouchn.cn%2f&to=-2&aid=6&ip=100.125.68.16&lou=http%3a%2f%2fshome.ouchn.cn%2f6%2fMCSAuthenticateLogOff.axd&sf=4968909290f6c894');
     await driver.findElement(By.id('username')).sendKeys('1821001453342');
     await driver.findElement(By.id('password')).sendKeys('19830526');
+    await handleVerifyCode(driver)
     await driver.wait(until.titleIs('学生空间'), 1000000);
     await driver.findElement(By.className('jbox-close')).click();
     console.log('Login Success!!!');
-    handleCouseLinks(driver)
+    await handleCouseLinks(driver)
 
   } finally {
-    //await driver.quit();
+    await driver.quit();
   }
 })();
 
