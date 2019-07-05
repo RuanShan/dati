@@ -15,7 +15,7 @@
     "test": "test"
   },
   "bin": {
-    "dati": "./index.js"
+    "dati": "./app.js"
   },
   "pkg": {
     "scripts": "node_modules/selenium-webdriver/lib/atoms/**/*.js",
