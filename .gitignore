@@ -11,3 +11,5 @@ yarn-error.log
 package-lock.json
 log/
 debug.log
+dati.exe
+eng.traineddata
