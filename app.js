@@ -2,10 +2,11 @@ const program = require('commander')
 
 program
     .command('profile [couse]', 'generate profile of couse')
-    .command('install [name]', 'install one or more packages')
-    .command('search [query]', 'search with optional query')
+    .command('learn [couse]', 'learn one or more couse')
+    .command('lmodule [module]', 'learn module')
     .version('0.0.1')
-    .option('-l, --list [list]', 'list of customers in CSV file')
+    .option('-u, --user [user]', 'user name')
+    .option('-p, --password [password]', 'user password')
     .parse(process.argv)
 
-console.log(program.list)
+console.log(program.u)
