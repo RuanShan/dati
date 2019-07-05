@@ -5,12 +5,20 @@ const {
   Key,
   until
 } = require('selenium-webdriver');
-function scrollToBottom(driver) {
+async function scrollToBottom(driver) {
 
+  let getScrollHeightScript = "return document.body.scrollHeight;"
+  let scrollHight =await driver.executeScript(getScrollHeightScript)
+  console.log( "scrollHight=", scrollHight)
   // let script = "var h=document.body.scrollHeight; window.scrollTo(0,document.body.scrollHeight)"
   // 每秒500px
   let script = 'var timespan = Math.ceil(document.body.scrollHeight/500)*1000; $("html,body").animate({scrollTop: document.body.scrollHeight + "px"}, timespan);'
   driver.executeScript(script)
+  let delay = Math.ceil(parseInt(scrollHight)/500)*1000
+
+  return new Promise((resolve, reject)=>{
+     setTimeout(resolve, delay);
+  })
 }
 
 function scrollToCenter(driver) {

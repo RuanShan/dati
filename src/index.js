@@ -16,15 +16,39 @@ const {
   until
 } = require('selenium-webdriver');
 
-async function handleCommandProfile( couseCode ){
+async function handleCommandProfile(couseCode) {
 
   let driver = await new Builder().forBrowser('chrome').build();
 
   let bot = new Bot(driver)
-  console.log( " bot doing profile a couse")
-  //bot.do
+  let filename = './log_3649.json'
+  let code = '464728'
+  console.log(" bot doing profile a couse")
+  await bot.login('1821001452683', '19771229')
+  await bot.prepareForLearn()
+  // await bot.handleCouseLinks()
+  // await bot.readText(code)
+  // await bot.watchVideo(code)
+  await bot.learnCourse(filename)
 
 }
+
+async function handleCommandModule(moduleCode) {
+
+  let driver = await new Builder().forBrowser('chrome').build();
+
+  let bot = new Bot(driver)
+  let filename = './log_3649.json'
+  console.log(" bot doing profile a couse")
+  await bot.login('1821001452683', '19771229')
+  // await bot.handleCouseLinks()
+  await bot.prepareForLearn()
+  // await bot.readText(moduleCode)
+  await bot.watchVideo(moduleCode)
+  // await bot.learnCourse(filename)
+
+}
+
 //
 // (async function example() {
 //   let driver = await new Builder().forBrowser('chrome').build();
@@ -267,7 +291,7 @@ async function watchVideo(driver) {
 
       if (isFinish == '未完成' && title.includes('视频')) {
         let url = course.url
-        if (!url.includes('resource')&& title.includes('视频')) {
+        if (!url.includes('resource') && title.includes('视频')) {
           await driver.get(url);
           let canvas = await driver.findElement(By.tagName('canvas'))
           await driver.wait(playVideo(driver, canvas), 100000000);
@@ -282,5 +306,6 @@ async function watchVideo(driver) {
 
 
 module.exports = {
-  handleCommandProfile
+  handleCommandProfile,
+  handleCommandModule
 }
