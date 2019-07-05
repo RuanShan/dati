@@ -7,6 +7,25 @@ const {
 const { scrollToBottom, playVideo }  = require('./util')
 const { getVerifyCode }  = require('./ocr')
 
+function autologin(){
+   // 
+
+}
+
+function learnCouse( couseCode){
+  //// 分析课程信息文件
+  ////
+}
+
+
+function learnModule( code ){
+
+/// text, video, quiz,
+/// do work
+
+}
+
+
 function learnText( driver ){
 
 }
