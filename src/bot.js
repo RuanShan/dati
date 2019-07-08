@@ -19,9 +19,22 @@ class Bot {
     this.driver = driver
   }
 
+  async getLog(username) {
+    let filename = username + '_log_' + '3649' + '.json'
 
+    await fs.readFile(filename, "utf-8", async (error, data) => {
+      if (error) return console.log(error.message);
+      var res = JSON.parse(data);
+      if (res != null) {
+        this.status = res.status;
+      } else {
+        console.log('can not read ', filename);
+      }
+    })
+    return filename
+  }
 
-  async handleCouseLinks() {
+  async handleCouseLinks(username) {
     let driver = this.driver
     let mainHandle = await driver.getWindowHandle()
     let links = await getCousesLinks(driver);
@@ -44,7 +57,7 @@ class Bot {
       if (mainHandle != handle) {
         let locator = driver.switchTo()
         await locator.window(handle)
-        await handleCouse(driver)
+        await handleCouse(driver, username)
       }
     }
 
@@ -64,43 +77,44 @@ class Bot {
 
   }
 
-  async learnCourse(filename) {
+  async learnCourse() {
     let driver = this.driver
-
-    await fs.readFile(filename, "utf-8", async (error, data) => {
-      if (error) return console.log(error.message);
-      var res = JSON.parse(data);
-      if (res != null) {
-        let score = res.score;
-        this.status = res.status;
-
-        for (let i = 0; i < this.status.length; i++) {
-          let course = this.status[i];
-          let isFinish = course.isFinish;
-          if (isFinish == '未完成') {
-            let url = course.url
-            let title = course.title
-            if (!url.includes('resource')) {
-              if (title.includes('视频')) {
-                await this.watchVideo(course.id)
-              } else {
-                await this.readText(course.id)
-              }
-            }
+    for (let i = 0; i < this.status.length; i++) {
+      let course = this.status[i];
+      let isFinish = course.isFinish;
+      if (isFinish == '未完成') {
+        let url = course.url
+        let title = course.title
+        if (!url.includes('resource')) {
+          if (title.includes('视频')) {
+            await this.watchVideo(course.id)
+          } else {
+            await this.readText(course.id)
           }
         }
-      } else {
-        console.log('can not read log.json');
       }
-    })
+    }
   }
 
 
 
   async learnModule(code) {
-
-    /// text, video, quiz,
-    /// do work
+    let driver = this.driver
+    for (let i = 0; i < this.status.length; i++) {
+      let course = this.status[i];
+      let isFinish = course.isFinish;
+      if (isFinish == '未完成' && course.id == code) {
+        let url = course.url
+        let title = course.title
+        if (!url.includes('resource')) {
+          if (title.includes('视频')) {
+            await this.watchVideo(course.id)
+          } else {
+            await this.readText(course.id)
+          }
+        }
+      }
+    }
 
   }
 
@@ -207,7 +221,7 @@ async function handleVerifyCode(driver) {
 
 }
 
-async function handleCouse(driver) {
+async function handleCouse(driver, username) {
   // 毛泽东思想和中国特色社会主义理论体系概论, 统计学原理   思想道德修养与法律基础  管理学基础
   //  经济数学基础  计算机应用基础
 
@@ -216,11 +230,11 @@ async function handleCouse(driver) {
   console.log(" tab.title1 ", title)
   console.log('毛泽东思想和中国特色社会主义理论体系概论', title.includes('毛泽东思想'));
   // if (title.includes('毛泽东思想')) {
-  await handleCouseMaoGai(driver)
+  await handleCouseMaoGai(driver, username)
   // }
 }
 
-async function handleCouseMaoGai(driver) {
+async function handleCouseMaoGai(driver, username) {
   let progressPath = "//div[@class='progress-bar']/span"
   let sectionl1Path = "//ul[@class='flexsections flexsections-level-1']/li"
   let sectionl2Path = "//ul[@class='flexsections flexsections-level-2']/li"
@@ -283,7 +297,7 @@ async function handleCouseMaoGai(driver) {
     status: status
   }
   console.log('json=====:', json);
-  let filename = './log_' + class_id + '.json'
+  let filename = './' + username + '_log_' + class_id + '.json'
   fs.writeFile(filename, JSON.stringify(json), (err) => {
     if (err) throw err;
     console.log('文件已被保存');
