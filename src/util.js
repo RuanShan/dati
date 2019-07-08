@@ -38,16 +38,12 @@ async function playVideo(driver, canvas) {
   let duration = await driver.wait(function() {
     return video.getAttribute('duration').then(function(aaaa) {
       console.log('aaaa----:', aaaa);
-      return aaaa
+      if(!(isNaN(aaaa))){
+        return aaaa
+      }
+      return  !(isNaN(aaaa))
     });
   }, 10000);
-
-console.log('duration++++++++++:', isNaN(duration));
-  while (isNaN(duration)) {
-    duration = await video.getAttribute('duration');
-  }
-
-
   console.log('duration----:', duration);
   // setTimeout
   await canvas.click()
