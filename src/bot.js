@@ -11,9 +11,11 @@ const {
 const fs = require('fs');
 // const { getVerifyCode }  = require('./ocr')
 
+
 class Bot {
 
   constructor(driver) {
+    this.status = [];
     this.driver = driver
   }
 
@@ -65,15 +67,15 @@ class Bot {
   async learnCourse(filename) {
     let driver = this.driver
 
-    await fs.readFile(filename, "utf-8", async (error, data)=> {
+    await fs.readFile(filename, "utf-8", async (error, data) => {
       if (error) return console.log(error.message);
       var res = JSON.parse(data);
       if (res != null) {
         let score = res.score;
-        let status = res.status;
+        this.status = res.status;
 
-        for (let i = 0; i < status.length; i++) {
-          let course = status[i];
+        for (let i = 0; i < this.status.length; i++) {
+          let course = this.status[i];
           let isFinish = course.isFinish;
           if (isFinish == '未完成') {
             let url = course.url
@@ -82,7 +84,7 @@ class Bot {
               if (title.includes('视频')) {
                 await this.watchVideo(course.id)
               } else {
-                // await this.readText(course.id)
+                await this.readText(course.id)
               }
             }
           }
@@ -106,75 +108,54 @@ class Bot {
   async readText(code) {
     console.log('==================readText=================');
     var driver = this.driver
+    let status = this.status
 
-    await fs.readFile("./log_3649.json", "utf-8", async function(error, data) {
-      if (error) return console.log(error.message);
-      var res = JSON.parse(data);
-      if (res != null) {
-        let score = res.score;
-        let status = res.status;
-        console.log('status----:', status.length);
+    for (let i = 0; i < status.length; i++) {
+      let course = status[i];
+      let isFinish = course.isFinish;
+      let id = course.id
 
-        for (let i = 0; i < status.length; i++) {
-          let course = status[i];
-          let isFinish = course.isFinish;
-          let id = course.id
-
-          if (isFinish == '未完成' && id == code) {
-            let url = course.url
-            let title = course.title
-            if (!url.includes('resource') && !title.includes('视频')) {
-              console.log('id-----:',id);
-              await driver.get(url);
-              console.log('reading ', title);
-              await driver.wait(scrollToBottom(driver), 100000000);
-              console.log('read finish', title);
-            }
-          }
+      if (isFinish == '未完成' && id == code) {
+        let url = course.url
+        let title = course.title
+        if (!url.includes('resource') && !title.includes('视频')) {
+          console.log('id-----:', id);
+          await driver.get(url);
+          console.log('reading ', title);
+          await driver.wait(scrollToBottom(driver), 100000000);
+          console.log('read finish', title);
         }
-      } else {
-        console.log('can not read log.json');
       }
-    })
+    }
   }
 
   async watchVideo(code) {
     console.log('==================watchVideo=================');
 
     let driver = this.driver
+    let status = this.status
 
-    await fs.readFile("./log_3649.json", "utf-8", async function(error, data) {
-      if (error) return console.log(error.message);
-      var res = JSON.parse(data);
-      if (res != null) {
-        let score = res.score;
-        let status = res.status;
+    for (let i = 0; i < status.length; i++) {
+      let course = status[i];
+      let isFinish = course.isFinish;
+      let id = course.id
 
-        for (let i = 0; i < status.length; i++) {
-          let course = status[i];
-          let isFinish = course.isFinish;
-          let id = course.id
-
-          if (isFinish == '未完成' && id == code) {
-            console.log('course-----:', course);
-            let url = course.url
-            let title = course.title
-            if (!url.includes('resource') && title.includes('视频')) {
-              await driver.get(url);
-              let canvas = await driver.findElement(By.tagName('canvas'))
-              console.log('this video is start');
-              await driver.wait(playVideo(driver, canvas), 100000000);
-              console.log('this video is done');
-            }
-          }
+      if (isFinish == '未完成' && id == code) {
+        console.log('course-----:', course);
+        let url = course.url
+        let title = course.title
+        if (!url.includes('resource') && title.includes('视频')) {
+          await driver.get(url);
+          let canvas = await driver.findElement(By.tagName('canvas'))
+          console.log('this video is start');
+          await driver.wait(playVideo(driver, canvas), 100000000);
+          console.log('this video is done');
         }
-      } else {
-        console.log('can not read log.json');
       }
-    })
+    }
   }
 
-  async prepareForLearn(){
+  async prepareForLearn() {
     let driver = this.driver
     let mainHandle = await driver.getWindowHandle()
     let links = await getCousesLinks(driver);

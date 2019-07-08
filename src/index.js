@@ -44,7 +44,10 @@ async function handleCommandModule(moduleCode) {
   // await bot.handleCouseLinks()
   await bot.prepareForLearn()
   // await bot.readText(moduleCode)
-  await bot.watchVideo(moduleCode)
+  for(var i=0;i<3;i++){
+    await bot.watchVideo(moduleCode)
+  }
+
   // await bot.learnCourse(filename)
 
 }
