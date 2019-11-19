@@ -19,35 +19,42 @@ const {
 async function handleCreateLog(couseCode) {
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver)
-  let filename = './log_3649.json'
   console.log(" bot doing profile a couse")
-  await bot.login('1821001452683', '19771229')
-  await bot.handleCouseLinks('1821001452683')
+  let username = '1934001474084'; // 1934001474084
+  let password = '19930902'       // 19930902
+  await bot.login(username, password)
+  //await bot.prepareForLearn(couseCode)
+  await bot.profileCouse(couseCode)
 }
 
-async function handleLearnAllModule(moduleCode) {
+async function handleLearnCourse(couseCode) {
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver)
   console.log(" bot doing handleLearnTextModule")
-  await bot.login('1821001452683', '19771229')
-  await bot.getLog('1821001452683')
-  await bot.prepareForLearn()
+  let username = '1934001474084'; // 1934001474084
+  let password = '19930902'       // 19930902
+  await bot.login(username, password)
+  await bot.getLog(username, couseCode)
+  //await bot.prepareForLearn(couseCode)
   await bot.learnCourse()
 }
 
-async function handleLearnByCodeModule(moduleCode) {
+async function handleLearnByCodeModule(couseCode, moduleCode) {
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver)
-  console.log(" bot doing handleLearnVideoModule")
-  await bot.login('1821001452683', '19771229')
-  await bot.getLog('1821001452683')
-  await bot.prepareForLearn()
+  console.debug(" bot 开始学习小节")
+  let username = '1934001474084'; // 1934001474084
+  let password = '19930902'       // 19930902
+  await bot.login(username, password)
+  await bot.getLog(username, couseCode)
+  console.debug("bot got log")
+  //await bot.prepareForLearn(couseCode)
   await bot.learnModule(moduleCode)
 }
 
 
 module.exports = {
   handleCreateLog,
-  handleLearnAllModule,
+  handleLearnCourse,
   handleLearnByCodeModule
 }

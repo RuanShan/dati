@@ -13,3 +13,5 @@ log/
 debug.log
 dati.exe
 eng.traineddata
+app.log
+db/

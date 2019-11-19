@@ -1,15 +1,20 @@
 const program = require('commander')
 const {
   handleCreateLog,
-  handleLearnAllModule,
+  handleLearnCourse,
   handleLearnByCodeModule
 } = require('./src/index')
+
+// example: node app.js -- createlog 4255 #毛泽东思想和中国特色社会主义理论体
 
 program
   .command('learn <couse>', 'learn one or more couse')
   .version('0.0.1')
   .option('-u, --user [user]', 'user name')
   .option('-p, --password [password]', 'user password')
+  .action(function( couse ){
+
+  })
 
 program.command('createlog <couse>')
   .description('handleCreateLog')
@@ -17,18 +22,18 @@ program.command('createlog <couse>')
     console.log("handleCreateLog ", couse)
     handleCreateLog(couse)
   })
-program.command('lallmodule <module>')
+program.command('lcouse <couse>')
   .description('learn all module')
-  .action(function(moduleCode) {
-    console.log("handleLearnAllModule ", moduleCode)
-    handleLearnAllModule(moduleCode)
+  .action(function(couse) {
+    console.log("handleLearnCourse ", couse)
+    handleLearnCourse(couse)
   })
 
-program.command('lonemodule <module>')
+program.command('lmodule <couse> <module>')
   .description('learn by code module')
-  .action(function(moduleCode) {
+  .action(function(couse, moduleCode) {
     console.log("handleLearnByCodeModule ", moduleCode)
-    handleLearnByCodeModule(moduleCode)
+    handleLearnByCodeModule(couse, moduleCode)
   })
 
 program.parse(process.argv)

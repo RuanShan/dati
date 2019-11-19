@@ -4,6 +4,7 @@ const {
   Key,
   until
 } = require('selenium-webdriver');
+const domain = 'ouchn.cn'
 async function scrollToBottom(driver) {
 
   let getScrollHeightScript = "return document.body.scrollHeight;"
@@ -11,7 +12,12 @@ async function scrollToBottom(driver) {
   console.log("scrollHight=", scrollHight)
   // let script = "var h=document.body.scrollHeight; window.scrollTo(0,document.body.scrollHeight)"
   // 每秒500px
+  // 需要检查路径是否在 http://anhui.ouchn.cn/ 下，animate可能不存在
+  let url = await driver.getCurrentUrl()
   let script = 'var timespan = Math.ceil(document.body.scrollHeight/500)*1000; $("html,body").animate({scrollTop: document.body.scrollHeight + "px"}, timespan);'
+  if( url.indexOf( domain )<0){
+    script = 'var timespan = Math.ceil(document.body.scrollHeight/500)*1000; window.scrollTo(0,document.body.scrollHeight);'
+  }
   driver.executeScript(script)
   let delay = Math.ceil(parseInt(scrollHight) / 500) * 1000
 
@@ -47,9 +53,9 @@ async function playVideo(driver, canvas) {
   console.log('duration----:', duration);
   // setTimeout
   await canvas.click()
-
+  // 等待视频播放完毕
   return new Promise((resolve, reject) => {
-    setTimeout(resolve, 10 * 1000, video);
+    setTimeout(resolve, duration * 1000, video);
   })
 
 }

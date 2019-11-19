@@ -23,13 +23,13 @@ const {
   let code = '464729'
 
   try {
-    let username = '1821001452683';
-    let password = '19771229'
+    let username = '1934001474084'; // 1934001474084
+    let password = '19930902'       // 19930902
     await login(driver, username, password)
     await handleCouseLinks(driver)
     // await readText(driver,code)
     // await watchVideo(driver,code)
-    await learnCourse(driver, filename)
+    //await learnCourse(driver, filename)
   } finally {
     // await driver.quit();
   }
@@ -37,12 +37,16 @@ const {
 
 async function login(driver, username, password) {
 
-  await driver.get('http://sso.ouchn.cn/Passport/Login?ru=http%3a%2f%2fshome.ouchn.cn%2f&to=-2&aid=6&ip=100.125.68.16&lou=http%3a%2f%2fshome.ouchn.cn%2f6%2fMCSAuthenticateLogOff.axd&sf=4968909290f6c894');
+  await driver.get('http://passport.ouchn.cn/Account/Login?ReturnUrl=%2Fconnect%2Fauthorize%2Fcallback%3Fclient_id%3Dstudentspace%26redirect_uri%3Dhttp%253A%252F%252Fstudent.ouchn.cn%252F%2523%252Fsignin-oidc%2523%26response_type%3Did_token%2520token%26scope%3Dopenid%2520profile%2520ouchnuser%2520ouchnstudentspaceapi%26state%3Df2b1c4eebd354996ab8f0c3b618f39d1%26nonce%3D044e6125331b4db298c6acf33b1058dd');
   await driver.findElement(By.id('username')).sendKeys(username);
   await driver.findElement(By.id('password')).sendKeys(password);
-  await handleVerifyCode(driver)
-  await driver.wait(until.titleIs('学生空间'), 1000000);
-  await driver.findElement(By.className('jbox-close')).click();
+  //await handleVerifyCode(driver)
+  //
+  let loginButton = await driver.findElement(By.css(".login-form button[value='login']"));
+  loginButton.click();
+  await driver.wait(until.titleContains('学生空间'), 100000);
+  await driver.get('http://student.ouchn.cn/')
+  //await driver.findElement(By.className('jbox-close')).click();
   console.log('Login Success!!!');
 
 }
@@ -52,14 +56,15 @@ async function login(driver, username, password) {
 async function getCousesLinks(driver) {
   // div id = LearningCourseDiv
   // text = 进入课程
-  let div = await driver.findElement(By.id('LearningCourseDiv'));
-  let links = await div.findElements(By.linkText('进入课程'));
-  // links.forEach(async (a)=>{
-  //   await a.click()
-  //   // generate a.href
-  // })
+  // 等待 zaixuekecheng dom生成
+  await driver.wait(until.elementLocated(By.id('zaixuekecheng')));
+  let div = await driver.findElement(By.id('zaixuekecheng'));
+  let links = await div.findElements(By.xpath('//button'));
+  links.forEach(async (a)=>{
+    await a.click()
+    // generate a.href
+  })
 
-  links[5].click()
   return links
 
 }
@@ -99,10 +104,12 @@ async function handleCouse(driver) {
   console.log(" tab.title0 ")
   let title = await driver.getTitle()
   console.log(" tab.title1 ", title)
-  console.log('毛泽东思想和中国特色社会主义理论体系概论', title.includes('毛泽东思想'));
-  // if (title.includes('毛泽东思想')) {
-  await handleCouseMaoGai(driver)
-  // }
+  if (title.includes('毛泽东思想')) {
+    console.log('毛泽东思想和中国特色社会主义理论体系概论', title.includes('毛泽东思想'));
+    await handleCouseMaoGai(driver)
+  }else{
+    console.log("待添加课程：", title)    
+  }
 }
 
 async function handleCouseMaoGai(driver) {
@@ -143,11 +150,18 @@ async function handleCouseMaoGai(driver) {
     for (let j = 0; j < levelTwo.length; j++) {
       let b = levelTwo[j]
       let text = await b.getText()
+      console.log(`levelTwo.text0 ${j} ${text} `)
       let id = await b.getAttribute('id')
-      let link = await b.findElement(By.css(sectionl2LinkCss))
-      let href = await link.getAttribute('href')
-      let img = await b.findElements(By.tagName('img'))
-      let alt = await img[1].getAttribute('alt')
+
+      let imgs = await b.findElements(By.tagName('img'))
+      let alt = "未完成"
+      let href = ''
+      if( imgs.length>=2){
+        // 由于前面的内容没有学习，可能没有链接元素，后面没有圆圈图片
+        alt = await imgs[1].getAttribute('alt')
+        let link = await b.findElement(By.css(sectionl2LinkCss))
+        href = await link.getAttribute('href')
+      }
       let course = {
         title: text,
         isFinish: alt.substring(0, 3),
