@@ -1,12 +1,12 @@
 
-// 毛泽东思想和中国特色社会主义理论体系概论
+// 国家开放大学学习指南
 const {
   Builder,
   By,
   Key,
   until
 } = require('selenium-webdriver');
-async function parseCouseMaoGai(driver) {
+async function parseCouseZhiNan(driver) {
 
   let progressPath = "//div[@class='progress-bar']/span"
   let sectionl1Path = "//ul[@class='flexsections flexsections-level-1']/li"
@@ -82,54 +82,6 @@ async function parseCouseMaoGai(driver) {
   return couseJson
 }
 
-// 抽离成公共方法
-const awaitWrap = (promise) => {
- return promise
-  .then(data => [null, data])
-  .catch(err => [err, null])
-}
-
-async function handleMaoGaiQuiz( driver, url, id ){
-  let xpath = "//div[@class='singlebutton quizstartbuttondiv']//button"
-  //let queXpath = "//div[@class='que truefalse deferredfeedback notyetanswered']"
-  let queSelector = ".que.notyetanswered"
-  let nextPageXpath = "//input[@value='下一页']"
-  let prevPageXpath = "//input[@value='上一页']"
-  let submitPageXpath = "//input[@value='结束答题…']"
-  let queContentXpath="//div[@class='qtext']/p"
-  let queAnswerXpath="//div[@class='answer']//input"
-  await driver.get(url)
-  await driver.wait(until.elementLocated(By.xpath(xpath)), 15000);
-  let button = await driver.findElement(By.xpath(xpath))
-  button.click() // 进入测试页面
-  await driver.wait(until.elementLocated(By.css(queSelector)), 15000);
-  // 可能不存在
-  const [err1, nextPage] = await awaitWrap(driver.findElement(By.xpath(nextPageXpath)))
-  const [err2, prevPage] = await awaitWrap(driver.findElement(By.xpath(prevPageXpath)))
-  const [err3, submitPage] = await awaitWrap(driver.findElement(By.xpath(submitPageXpath)))
-  let questions = await driver.findElements(By.css(queSelector))
-  console.debug( `questions:${questions.length}`)
-
-  for (let i = 0; i < questions.length; i++) {
-    let questionEle = questions[i];
-    let content = await questionEle.findElement(By.css('.qtext p'))
-    let answerInputs = await questionEle.findElements(By.css('.answer input'))
-    let answerLabels = await questionEle.findElements(By.css('.answer label'))
-    let question = await content.getText()
-    // answers[0] = 对 answers[1] = 错
-    let answers = []
-
-    for( let j = 0; j< answerInputs.length; j++){
-      let answer = answerInputs[j];
-      let label = answerLabels[j]
-      let a =  await answer.getAttribute('value')
-      let b =  await label.getText( )
-      answers.push( a+b )
-    }
-    console.debug( `question: ${question}, answer: ${answerInputs.length} ${answers}`);
-  }
-}
 module.exports={
-  parseCouseMaoGai,
-  handleMaoGaiQuiz
+  parseCouseZhiNan
 }

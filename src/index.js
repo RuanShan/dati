@@ -23,33 +23,35 @@ async function handleCreateLog(couseCode) {
   let username = '1934001474084'; // 1934001474084
   let password = '19930902'       // 19930902
   await bot.login(username, password)
-  //await bot.prepareForLearn(couseCode)
+  await bot.prepareForLearn(couseCode)
   await bot.profileCouse(couseCode)
+  driver.close()
 }
 
 async function handleLearnCourse(couseCode) {
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver)
-  console.log(" bot doing handleLearnTextModule")
+  console.log(" bot doing handleLearnCourse")
   let username = '1934001474084'; // 1934001474084
   let password = '19930902'       // 19930902
   await bot.login(username, password)
   await bot.getLog(username, couseCode)
-  //await bot.prepareForLearn(couseCode)
+  await bot.prepareForLearn(couseCode)
   await bot.learnCourse()
+  driver.close()
 }
 
 async function handleLearnByCodeModule(couseCode, moduleCode) {
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver)
-  console.debug(" bot 开始学习小节")
+  console.debug("开始学习小节")
   let username = '1934001474084'; // 1934001474084
   let password = '19930902'       // 19930902
   await bot.login(username, password)
   await bot.getLog(username, couseCode)
-  console.debug("bot got log")
-  //await bot.prepareForLearn(couseCode)
+  await bot.prepareForLearn(couseCode)
   await bot.learnModule(moduleCode)
+  driver.close()
 }
 
 

@@ -38,6 +38,8 @@ const CouseUrlMap = {
   '4255': 'http://anhui.ouchn.cn/course/view.php?id=4255' // 毛泽东思想和中国特色社会主义理论体系概论
 }
 
+const { parseCouseMaoGai, handleMaoGaiQuiz } = require('./couses/maogai')
+const { parseCouseZhiNan } = require('./couses/zhinan')
 
 class Bot {
 
@@ -56,18 +58,18 @@ class Bot {
   }
 
   async getLog(username, couseCode) {
-    this.couseCode = couseCode
+    let that = this
+    that.couseCode = couseCode
     let filename = await this.getCouseJsonPath(couseCode)
+    let data = fs.readFileSync(filename, "utf-8")
+    if (data != null) {
 
-    await fs.readFile(filename, "utf-8", async (error, data) => {
-      if (error) return console.log(error.message);
-      var res = JSON.parse(data);
-      if (res != null) {
-        this.couseJson.status = res.status;
-      } else {
-        logger.error(`无法读取课程数据文件 ${filename}`);
-      }
-    })
+      let res = JSON.parse(data);
+      that.couseJson= res;
+    } else {
+      logger.error(`无法读取课程数据文件 ${filename}`);
+    }
+
     return filename
   }
 
@@ -115,20 +117,23 @@ class Bot {
     this.recursiveCount += 1
     let driver = this.driver
     let moduleStatus = this.couseJson.status
+
     for (let i = 0; i < moduleStatus.length; i++) {
-      let course = moduleStatus[i];
-      let isFinish = course.isFinish;
-      let url = course.url
+      let lession = moduleStatus[i];
+      let isFinish = lession.isFinish;
+      let url = lession.url
       if (url.length == 0) {
         continue
       }
       if (isFinish == '未完成') {
-        let title = course.title
+        let title = lession.title
+        logger.info(`学习小节${title} url=${url}`)
+
         if (!url.includes('resource')) {
           if (title.includes('视频')) {
-            await this.watchVideo(course.id)
+            await this.watchVideo(lession)
           } else {
-            await this.readText(course.id)
+            await this.readText(lession)
           }
         }
       }
@@ -141,7 +146,7 @@ class Bot {
       // 重新生成数据，重新学习，主要是学习视频，有些小节视频较多
       if (this.recursiveCount < 15) {
         logger.info(`课程${ this.couseCode}递归了${this.recursiveCount}次，还没有完成。`)
-        await this.profileCouse()
+        await this.profileCouse( )
         await this.learnCourse()
       } else {
         logger.error(`课程${ this.couseCode}递归了15次，还没有完成。`)
@@ -164,7 +169,6 @@ class Bot {
         console.debug(`小节 ${title} 没有 url`);
         continue
       }
-
       if (isFinish == '未完成' && lession.id == moduleCode) {
         // 根据url判断类型
         // 视频|外部文章：mod/url/view
@@ -179,11 +183,16 @@ class Bot {
           }
         } else if (url.includes('/mod/page/view')) {
           await this.readText(lession)
+        } else if (url.includes('/mod/quiz/view')) {
+          await this.goQuiz(lession)
         } else {
-          logger.info(`无法识别的课程url =${url}`)
+          logger.error(`无法识别的课程url =${url}`)
         }
 
       }
+      //  logger.error(`无法识别的小节代码 =${moduleCode}`)
+
+
     }
 
   }
@@ -197,8 +206,8 @@ class Bot {
     let id = lession.id
 
     if (isFinish == '未完成') {
-      let url = course.url
-      let title = course.title
+      let url = lession.url
+      let title = lession.title
 
       await driver.get(url);
       console.debug('reading ', title);
@@ -231,8 +240,26 @@ class Bot {
 
   }
 
+  async goQuiz(lession){
+    let driver = this.driver
+    let isFinish = lession.isFinish;
+    let id = lession.id
+
+    if (isFinish == '未完成') {
+      console.log('course-----:', lession);
+      let url = lession.url
+      let title = lession.title
+      if (this.couseCode == '4255') {
+        await handleMaoGaiQuiz(driver, url, id )
+      }
+      console.log('this quiz is done');
+    }
+
+
+  }
   // 当前在主页，打开所有课程页面
   // 确定当前课程的url 和 code
+  //需要点击一下 ‘进入学习’，获得访问权限 地区.ouchn.cn/course
   async prepareForLearn(couseCode) {
     let driver = this.driver
     let mainHandle = await driver.getWindowHandle()
@@ -289,104 +316,105 @@ class Bot {
   async profileCouse(couseCode) {
     // 毛泽东思想和中国特色社会主义理论体系概论, 统计学原理   思想道德修养与法律基础  管理学基础
     //  经济数学基础  计算机应用基础
-    this.couseCode = couseCode
+    this.couseCode = couseCode || this.couseCode
     console.log(" tab.title0 ")
     let url = CouseUrlMap[this.couseCode]
     if (url) {
       await this.driver.get(url)
       let title = await this.driver.getTitle()
       console.log(" tab.title1 ", title, this.couseCode, typeof(this.couseCode))
-
       if (this.couseCode == '4255') {
-        await this.handleCouseMaoGai()
+        this.couseJson = await parseCouseMaoGai( this.driver )
       } else if (this.couseCode == '4125') {
-        await this.handleCouseMaoGai()
+        this.couseJson = await parseCouseZhiNan( this.driver )
       } else if (this.couseCode == '3833') {
-        await this.handleCouseMaoGai()
+        this.couseJson = await parseCouseMaoGai( this.driver )
       } else if (this.couseCode == '4157') {
-        await this.handleCouseMaoGai()
+        this.couseJson = await parseCouseMaoGai( this.driver )
       }
+
+      this.saveCouseJson(this.couseCode)
     } else {
       console.debug(`课程代码 ${ this.couseCode} 找不到课程url`);
     }
   }
 
-  async handleCouseMaoGai() {
-    let driver = this.driver
-    let progressPath = "//div[@class='progress-bar']/span"
-    let sectionl1Path = "//ul[@class='flexsections flexsections-level-1']/li"
-    let sectionl2Path = "//ul[@class='flexsections flexsections-level-2']/li"
-    let sectionl2Css = "li.activity"
-    let sectionl2LinkCss = "a"
-    await driver.wait(until.elementLocated(By.className('progress-bar')), 10000);
-
-    let url = await driver.getCurrentUrl()
-    console.log('url----------------:', url);
-    let classId = url.substring(url.indexOf('id=') + 3);
-    console.log('classId----:', classId);
-
-
-    let levelOne = await driver.findElements(By.xpath(sectionl1Path))
-    let progressContainer = await driver.findElement(By.xpath(progressPath))
-    let progress = await progressContainer.getText()
-
-    let status = []
-    let classinfo = {
-      url: url,
-      classId: classId,
-      progress: progress
-    }
-    for (let i = 0; i < levelOne.length; i++) {
-      let a = levelOne[i]
-      let text = await a.getText()
-      let id = await a.getAttribute('id')
-      console.log(`levelOne.text ${i} ${id} ${text}`)
-      let levelTwo = await a.findElements(By.css(sectionl2Css))
-      if (levelTwo.length == 0) {
-        console.log(`levelOne.text ${i} ${id} ${text} 没有内容。`)
-        continue
-      }
-      let b = levelTwo[0]
-
-      let isDisplayed = await b.isDisplayed()
-      if (!isDisplayed) {
-        // 显示下级内容
-        a.click()
-      }
-
-      for (let j = 0; j < levelTwo.length; j++) {
-        let b = levelTwo[j]
-        let text = await b.getText()
-        let id = await b.getAttribute('id')
-        let imgs = await b.findElements(By.tagName('img'))
-        let alt = "未完成"
-        let href = ''
-        if (imgs.length >= 2) {
-          // 由于前面的内容没有学习，可能没有链接元素，后面没有圆圈图片
-          alt = await imgs[1].getAttribute('alt')
-          let link = await b.findElement(By.css(sectionl2LinkCss))
-          href = await link.getAttribute('href')
-        }
-        let course = {
-          title: text,
-          isFinish: alt.substring(0, 3),
-          url: href,
-          id: id.substring(7)
-        }
-        status.push(course)
-        if (alt.startsWith("未完成")) {
-          console.log(`levelTwo.text ${j} ${id} ${text} ${href} ${alt}`)
-        }
-      }
-    }
-    this.couseJson = {
-      score: classinfo,
-      status: status
-    }
-
-    this.saveCouseJson(classId)
-    console.log("end handleCouseMaoGai ")
-  }
+  // async handleCouseMaoGai() {
+  //   let driver = this.driver
+  //   let progressPath = "//div[@class='progress-bar']/span"
+  //   let sectionl1Path = "//ul[@class='flexsections flexsections-level-1']/li"
+  //   let sectionl2Path = "//ul[@class='flexsections flexsections-level-2']/li"
+  //   let sectionl2Css = "li.activity"
+  //   let sectionl2LinkCss = "a"
+  //   await driver.wait(until.elementLocated(By.className('progress-bar')), 10000);
+  //
+  //   let url = await driver.getCurrentUrl()
+  //   console.log('url----------------:', url);
+  //   let classId = url.substring(url.indexOf('id=') + 3);
+  //   console.log('classId----:', classId);
+  //
+  //
+  //   let levelOne = await driver.findElements(By.xpath(sectionl1Path))
+  //   let progressContainer = await driver.findElement(By.xpath(progressPath))
+  //   let progress = await progressContainer.getText()
+  //
+  //   let status = []
+  //   let classinfo = {
+  //     url: url,
+  //     classId: classId,
+  //     progress: progress
+  //   }
+  //   for (let i = 0; i < levelOne.length; i++) {
+  //     let a = levelOne[i]
+  //     let text = await a.getText()
+  //     let id = await a.getAttribute('id')
+  //     console.log(`levelOne.text ${i} ${id} ${text}`)
+  //     let levelTwo = await a.findElements(By.css(sectionl2Css))
+  //     if (levelTwo.length == 0) {
+  //       console.log(`levelOne.text ${i} ${id} ${text} 没有内容。`)
+  //       continue
+  //     }
+  //     let b = levelTwo[0]
+  //
+  //     let isDisplayed = await b.isDisplayed()
+  //     if (!isDisplayed) {
+  //       // 显示下级内容
+  //       a.click()
+  //     }
+  //
+  //     for (let j = 0; j < levelTwo.length; j++) {
+  //       let b = levelTwo[j]
+  //       let text = await b.getText()
+  //       let id = await b.getAttribute('id')
+  //       let imgs = await b.findElements(By.tagName('img'))
+  //       let alt = "未完成"
+  //       let href = ''
+  //       if (imgs.length >= 2) {
+  //         // 由于前面的内容没有学习，可能没有链接元素，后面没有圆圈图片
+  //         alt = await imgs[1].getAttribute('alt')
+  //         let link = await b.findElement(By.css(sectionl2LinkCss))
+  //         href = await link.getAttribute('href')
+  //       }
+  //       let course = {
+  //         title: text,
+  //         isFinish: alt.substring(0, 3),
+  //         url: href,
+  //         id: id.substring(7)
+  //       }
+  //       status.push(course)
+  //       if (alt.startsWith("未完成")) {
+  //         console.log(`levelTwo.text ${j} ${id} ${text} ${href} ${alt}`)
+  //       }
+  //     }
+  //   }
+  //   this.couseJson = {
+  //     score: classinfo,
+  //     status: status
+  //   }
+  //
+  //   this.saveCouseJson(classId)
+  //   console.log("end handleCouseMaoGai ")
+  // }
 
   async getCousesLinks(driver) {
     // 等待 zaixuekecheng dom生成
