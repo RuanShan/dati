@@ -13,8 +13,12 @@ async function parseCouseMaoGai(driver) {
   let sectionl2Path = "//ul[@class='flexsections flexsections-level-2']/li"
   let sectionl2Css = "li.activity"
   let sectionl2LinkCss = "a"
-  await driver.wait(until.elementLocated(By.className('progress-bar')), 10000);
 
+  console.log('before wait ');
+  await driver.wait(until.elementLocated(By.className('progress-bar')), 10000);
+  console.log('after wait ');
+
+  let title = await driver.getTitle()
   let url = await driver.getCurrentUrl()
   console.log('url----------------:', url);
   let classId = url.substring(url.indexOf('id=') + 3);
@@ -27,6 +31,7 @@ async function parseCouseMaoGai(driver) {
 
   let status = []
   let classinfo = {
+    title: title,
     url: url,
     classId: classId,
     progress: progress
@@ -56,13 +61,28 @@ async function parseCouseMaoGai(driver) {
       let imgs = await b.findElements(By.tagName('img'))
       let alt = "未完成"
       let href = ''
+      let type = 'unkonwn' // text, video, quiz
+      // http://anhui.ouchn.cn/theme/blueonionre/pix/page_h.png
+      // http://anhui.ouchn.cn/theme/blueonionre/pix/core_h.png
+      // http://anhui.ouchn.cn/theme/blueonionre/pix/quiz_h.png
       if (imgs.length >= 2) {
+        // 每节课前面的图标
+        let src = await imgs[0].getAttribute('src')
+        if( src.includes('core_h.png')){
+          type = 'video'
+        }else if( src.includes('quiz_h.png')){
+          type = 'quiz'
+        }else if( src.includes('page_h.png')){
+          type = 'page'
+        }
+
         // 由于前面的内容没有学习，可能没有链接元素，后面没有圆圈图片
         alt = await imgs[1].getAttribute('alt')
         let link = await b.findElement(By.css(sectionl2LinkCss))
         href = await link.getAttribute('href')
       }
       let course = {
+        type: type,
         title: text,
         isFinish: alt.substring(0, 3),
         url: href,
@@ -70,7 +90,7 @@ async function parseCouseMaoGai(driver) {
       }
       status.push(course)
       if (alt.startsWith("未完成")) {
-        console.log(`levelTwo.text ${j} ${id} ${text} ${href} ${alt}`)
+        console.log(`levelTwo.text ${j} ${id} ${type} ${text} ${href} ${alt}`)
       }
     }
   }

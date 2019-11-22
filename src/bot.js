@@ -9,6 +9,7 @@ const {
   playVideo
 } = require('./util')
 const fs = require('fs');
+const URL = require('url');
 
 const log4js = require('log4js');
 log4js.configure({
@@ -31,6 +32,7 @@ log4js.configure({
 const logger = log4js.getLogger();
 
 // const { getVerifyCode }  = require('./ocr')
+// 每个学生来自不同地方，可能url不同
 const CouseUrlMap = {
   '4125': 'http://anhui.ouchn.cn/course/view.php?id=4125', // 国家开放大学学习指南
   '4257': 'http://anhui.ouchn.cn/course/view.php?id=4257', // 思想道德修养与法律基础
@@ -122,6 +124,7 @@ class Bot {
       let lession = moduleStatus[i];
       let isFinish = lession.isFinish;
       let url = lession.url
+      let type = lession.type
       if (url.length == 0) {
         continue
       }
@@ -129,12 +132,15 @@ class Bot {
         let title = lession.title
         logger.info(`学习小节${title} url=${url}`)
 
-        if (!url.includes('resource')) {
-          if (title.includes('视频')) {
-            await this.watchVideo(lession)
-          } else {
-            await this.readText(lession)
-          }
+        if ( type== 'video'  ) {
+          //http://anhui.ouchn.cn/course/view.php?id=4257&sectionid=91623&mid=561704
+          await this.watchVideo(lession)
+        } else if (url.includes('/mod/page/view')) {
+          await this.readText(lession)
+        } else if (url.includes('/mod/quiz/view')) {
+          await this.goQuiz(lession)
+        } else {
+          logger.error(`无法识别的课程url =${url}`)
         }
       }
     }
@@ -164,6 +170,7 @@ class Bot {
       let lession = moduleStatus[i];
       let title = lession.title
       let isFinish = lession.isFinish;
+      let type = lession.type
       let url = lession.url
       if (url.length == 0) {
         console.debug(`小节 ${title} 没有 url`);
@@ -175,12 +182,10 @@ class Bot {
         // 文本: mod/page/view
         // 专题测验：mod/quiz/view
         // 考核说明：mod/resource/view, 重定向到pdf
-        if (url.includes('/mod/url/view')) {
-          if (title.includes('视频')) {
-            await this.watchVideo(lession)
-          } else {
-            await this.readText(lession)
-          }
+        console.debug(`类型 ${type} 小节 ${title} `);
+        if ( type== 'video'  ) {
+          //http://anhui.ouchn.cn/course/view.php?id=4257&sectionid=91623&mid=561704
+          await this.watchVideo(lession)
         } else if (url.includes('/mod/page/view')) {
           await this.readText(lession)
         } else if (url.includes('/mod/quiz/view')) {
@@ -188,7 +193,6 @@ class Bot {
         } else {
           logger.error(`无法识别的课程url =${url}`)
         }
-
       }
       //  logger.error(`无法识别的小节代码 =${moduleCode}`)
 
@@ -229,13 +233,11 @@ class Bot {
       console.log('course-----:', lession);
       let url = lession.url
       let title = lession.title
-      if (!url.includes('resource') && title.includes('视频')) {
-        await driver.get(url);
-        let canvas = await driver.findElement(By.tagName('canvas'))
-        console.log('this video is start');
-        await driver.wait(playVideo(driver, canvas), 100000000);
-        console.log('this video is done');
-      }
+      await driver.get(url);
+      let canvas = await driver.findElement(By.tagName('canvas'))
+      console.log('this video is start');
+      await driver.wait(playVideo(driver, canvas), 100000000);
+      console.log('this video is done');
     }
 
   }
@@ -285,11 +287,16 @@ class Bot {
     let url = ''
     for (let i = 0; i < handles.length; i++) {
       let handle = handles[i]
-      console.log("mainHandle", mainHandle, "handle = ", handle)
+      console.log("mainHandle", i, mainHandle, "handle = ", handle)
       if (mainHandle != handle) {
         let locator = driver.switchTo()
         await locator.window(handle)
         let url = await driver.getCurrentUrl()
+        let parsedUrl = URL.parse(url, true)
+        console.debug("parsed= ",parsedUrl);
+        if( parsedUrl.query['id']){
+          CouseUrlMap[ parsedUrl.query['id']] = url
+        }
         // 如果找到当前这门课的窗口
         if (url.indexOf(couseCode) >= 0) {
           this.couseUrl = url
@@ -317,9 +324,10 @@ class Bot {
     // 毛泽东思想和中国特色社会主义理论体系概论, 统计学原理   思想道德修养与法律基础  管理学基础
     //  经济数学基础  计算机应用基础
     this.couseCode = couseCode || this.couseCode
-    console.log(" tab.title0 ")
+
     let url = CouseUrlMap[this.couseCode]
     if (url) {
+      // 第二次递归时，必须先访问url
       await this.driver.get(url)
       let title = await this.driver.getTitle()
       console.log(" tab.title1 ", title, this.couseCode, typeof(this.couseCode))
@@ -329,7 +337,7 @@ class Bot {
         this.couseJson = await parseCouseZhiNan( this.driver )
       } else if (this.couseCode == '3833') {
         this.couseJson = await parseCouseMaoGai( this.driver )
-      } else if (this.couseCode == '4157') {
+      } else if (this.couseCode == '4257') {
         this.couseJson = await parseCouseMaoGai( this.driver )
       }
 
