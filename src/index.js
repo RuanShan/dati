@@ -16,24 +16,31 @@ const {
   until
 } = require('selenium-webdriver');
 
-async function handleCreateLog(couseCode) {
+async function handleCreateLog(couseCode, username, password ) {
+  if( !username || !password){
+    throw  new Error( "用户名和密码是必须的")
+  }
+
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver)
   console.log(" bot doing profile a couse")
-  let username = '1934001474084'; // 1934001474084
-  let password = '19930902'       // 19930902
+    // 1934001474084
+    // 19930902
   await bot.login(username, password)
   await bot.prepareForLearn(couseCode)
   await bot.profileCouse(couseCode)
   driver.close()
 }
 
-async function handleLearnCourse(couseCode) {
+async function handleLearnCourse(couseCode, username, password) {
+  if( !username || !password){
+    throw  new Error( "用户名和密码是必须的")
+  }
+  
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver)
   console.log(" bot doing handleLearnCourse")
-  let username = '1934001474084'; // 1934001474084
-  let password = '19930902'       // 19930902
+
   await bot.login(username, password)
   await bot.getLog(username, couseCode)
   await bot.prepareForLearn(couseCode)

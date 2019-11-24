@@ -45,7 +45,11 @@ const { parseCouseZhiNan } = require('./couses/zhinan')
 
 class Bot {
 
-  constructor(driver) {
+  constructor(driver ) {
+    // if( !user || !password){
+    //   throw  new Error( "用户名和密码是必须的")
+    //
+    // }
     this.mainHandle = null;
     this.status = [];
     this.driver = driver;
@@ -99,6 +103,7 @@ class Bot {
 
 
   async login(username, password) {
+
     this.username = username
     this.password = password
     let driver = this.driver
