@@ -36,7 +36,7 @@ async function handleLearnCourse(couseCode, username, password) {
   if( !username || !password){
     throw  new Error( "用户名和密码是必须的")
   }
-  
+
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver)
   console.log(" bot doing handleLearnCourse")
@@ -48,12 +48,12 @@ async function handleLearnCourse(couseCode, username, password) {
   driver.close()
 }
 
-async function handleLearnByCodeModule(couseCode, moduleCode) {
+async function handleLearnByCodeModule(couseCode, moduleCode,username, password) {
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver)
   console.debug("开始学习小节")
-  let username = '1934001474084'; // 1934001474084
-  let password = '19930902'       // 19930902
+  // let username = '1934001474084'; // 1934001474084
+  // let password = '19930902'       // 19930902
   await bot.login(username, password)
   await bot.getLog(username, couseCode)
   await bot.prepareForLearn(couseCode)
