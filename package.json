@@ -11,7 +11,7 @@
   "devDependencies": {},
   "scripts": {
     "test": "test",
-    "pkg": "pkg ."
+    "pkg": "pkg . --out-path=./dist"
   },
   "bin": {
     "dati": "./app.js"
