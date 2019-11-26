@@ -57,8 +57,18 @@ async function handleLearnByCodeModule(couseCode, moduleCode,username, password)
   await bot.login(username, password)
   await bot.getLog(username, couseCode)
   await bot.prepareForLearn(couseCode)
-  await bot.learnModule(moduleCode)
-  driver.close()
+  let status = bot.couseJson.status
+  let quizList = []
+  for(let i=0;i<status.length;i++){
+    if(status[i].type == 'quiz'){
+      quizList.push(status[i])
+    }
+  }
+  console.log('quizList-----:',quizList);
+  for(let i=0;i<quizList.length;i++){
+    await bot.goQuiz(quizList[i],i)
+  }
+  // driver.close()
 }
 
 

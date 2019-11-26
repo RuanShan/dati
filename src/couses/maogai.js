@@ -6,6 +6,9 @@ const {
   Key,
   until
 } = require('selenium-webdriver');
+
+const {AnswerList} = require ('../makeAnswerJson.js');
+
 async function parseCouseMaoGai(driver) {
 
   let progressPath = "//div[@class='progress-bar']/span"
@@ -109,7 +112,7 @@ const awaitWrap = (promise) => {
   .catch(err => [err, null])
 }
 
-async function handleMaoGaiQuiz( driver, url, id ){
+async function handleMaoGaiQuiz( driver, url, id ,num){
   let xpath = "//div[@class='singlebutton quizstartbuttondiv']//button"
   //let queXpath = "//div[@class='que truefalse deferredfeedback notyetanswered']"
   let queSelector = ".que.notyetanswered"
@@ -130,23 +133,38 @@ async function handleMaoGaiQuiz( driver, url, id ){
   let questions = await driver.findElements(By.css(queSelector))
   console.debug( `questions:${questions.length}`)
 
+  let keyWords1 = ['一', '二', '三', '四'];
+  let level_1 = 0;
+  let level_2 = 0;
+  let fakeQuestionNum = 0;
+
+  let answerList = new AnswerList()
+
+  let jsonStr = answerList.makeAnswerJson("./db/xi.txt")
+
   for (let i = 0; i < questions.length; i++) {
     let questionEle = questions[i];
     let content = await questionEle.findElement(By.css('.qtext p'))
     let answerInputs = await questionEle.findElements(By.css('.answer input'))
     let answerLabels = await questionEle.findElements(By.css('.answer label'))
     let question = await content.getText()
-    // answers[0] = 对 answers[1] = 错
-    let answers = []
-
+    console.log('question---:',question);
+    if(keyWords1.indexOf(question[0]) != -1){
+      fakeQuestionNum++;
+      continue;
+    }
+    let key = jsonStr[num][level_1][i-fakeQuestionNum]
+    console.log('key---:',key);
     for( let j = 0; j< answerInputs.length; j++){
       let answer = answerInputs[j];
       let label = answerLabels[j]
       let a =  await answer.getAttribute('value')
-      let b =  await label.getText( )
-      answers.push( a+b )
+      let b =  await label.getText()
+      if(b[0]==key.answer[0]){
+        label.click()
+        console.log(a+b);
+      }
     }
-    console.debug( `question: ${question}, answer: ${answerInputs.length} ${answers}`);
   }
 }
 module.exports={

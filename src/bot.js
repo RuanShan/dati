@@ -247,7 +247,7 @@ class Bot {
 
   }
 
-  async goQuiz(lession){
+  async goQuiz(lession,num){
     let driver = this.driver
     let isFinish = lession.isFinish;
     let id = lession.id
@@ -256,8 +256,9 @@ class Bot {
       console.log('course-----:', lession);
       let url = lession.url
       let title = lession.title
-      if (this.couseCode == '4255') {
-        await handleMaoGaiQuiz(driver, url, id )
+      console.log('this.couseCode---:',this.couseCode);
+      if (this.couseCode == '3833') {
+        await handleMaoGaiQuiz(driver, url, id ,num)
       }
       console.log('this quiz is done');
     }
