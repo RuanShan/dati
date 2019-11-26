@@ -6,21 +6,20 @@
   "dependencies": {
     "commander": "^2.20.0",
     "log4js": "^6.1.0",
-    "readline-sync": "^1.4.10",
-    "selenium-webdriver": "^4.0.0-alpha.4",
-    "sharp": "^0.22.1",
-    "tesseract.js": "^1.0.19"
+    "selenium-webdriver": "^4.0.0-alpha.4"
   },
   "devDependencies": {},
   "scripts": {
-    "test": "test"
+    "test": "test",
+    "pkg": "pkg . --out-path=./dist"
   },
   "bin": {
     "dati": "./app.js"
   },
   "pkg": {
     "scripts": "node_modules/selenium-webdriver/lib/atoms/**/*.js",
-    "assets": "views/**/*"
+    "assets": "views/**/*",
+    "targets": ["host"]
   },
   "repository": {
     "type": "git",
