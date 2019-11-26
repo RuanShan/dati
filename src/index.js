@@ -103,7 +103,7 @@ async function handleLearnByCodeModule(couseCode, moduleCode,username, password)
   await bot.login(username, password)
   await bot.getLog(username, couseCode)
   await bot.prepareForLearn(couseCode)
-  let status = bot.couseJson.status
+  let status = bot.couseInfo.status
   let quizList = []
   for(let i=0;i<status.length;i++){
     if(status[i].type == 'quiz'){
@@ -114,7 +114,7 @@ async function handleLearnByCodeModule(couseCode, moduleCode,username, password)
   for(let i=0;i<quizList.length;i++){
     await bot.goQuiz(quizList[i],i)
   }
-  // driver.close()
+  // await driver.quit()
 }
 
 async function saveUserJson(username, userInfo) {

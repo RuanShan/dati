@@ -113,9 +113,10 @@ const awaitWrap = (promise) => {
 }
 
 async function handleMaoGaiQuiz( driver, url, id ,num){
+  console.log('====================handleMaoGaiQuiz================');
   let xpath = "//div[@class='singlebutton quizstartbuttondiv']//button"
   //let queXpath = "//div[@class='que truefalse deferredfeedback notyetanswered']"
-  let queSelector = ".que.notyetanswered"
+  let queSelector = ".que"
   let nextPageXpath = "//input[@value='下一页']"
   let prevPageXpath = "//input[@value='上一页']"
   let submitPageXpath = "//input[@value='结束答题…']"
@@ -125,11 +126,13 @@ async function handleMaoGaiQuiz( driver, url, id ,num){
   await driver.wait(until.elementLocated(By.xpath(xpath)), 15000);
   let button = await driver.findElement(By.xpath(xpath))
   button.click() // 进入测试页面
+  console.log('111111111111111111111111111111');
   await driver.wait(until.elementLocated(By.css(queSelector)), 15000);
   // 可能不存在
   const [err1, nextPage] = await awaitWrap(driver.findElement(By.xpath(nextPageXpath)))
   const [err2, prevPage] = await awaitWrap(driver.findElement(By.xpath(prevPageXpath)))
   const [err3, submitPage] = await awaitWrap(driver.findElement(By.xpath(submitPageXpath)))
+
   let questions = await driver.findElements(By.css(queSelector))
   console.debug( `questions:${questions.length}`)
 
@@ -160,7 +163,7 @@ async function handleMaoGaiQuiz( driver, url, id ,num){
       let label = answerLabels[j]
       let a =  await answer.getAttribute('value')
       let b =  await label.getText()
-      if(b[0]==key.answer[0]){
+      if(b[0].toLowerCase()==key.answer[0].toLowerCase()){
         label.click()
         console.log(a+b);
       }
