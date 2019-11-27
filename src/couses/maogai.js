@@ -112,7 +112,7 @@ const awaitWrap = (promise) => {
   .catch(err => [err, null])
 }
 
-async function handleMaoGaiQuiz( driver, url, id ,num){
+async function handleMaoGaiQuiz( driver, url, id ,num,isFirstPage){
   console.log('====================handleMaoGaiQuiz================');
   let xpath = "//div[@class='singlebutton quizstartbuttondiv']//button"
   //let queXpath = "//div[@class='que truefalse deferredfeedback notyetanswered']"
@@ -122,10 +122,15 @@ async function handleMaoGaiQuiz( driver, url, id ,num){
   let submitPageXpath = "//input[@value='结束答题…']"
   let queContentXpath="//div[@class='qtext']/p"
   let queAnswerXpath="//div[@class='answer']//input"
-  await driver.get(url)
-  await driver.wait(until.elementLocated(By.xpath(xpath)), 15000);
-  let button = await driver.findElement(By.xpath(xpath))
-  button.click() // 进入测试页面
+  console.log('isFirstPage-----:',isFirstPage);
+  if(isFirstPage){
+    console.log('==============isFirstPage==============');
+    await driver.get(url)
+    await driver.wait(until.elementLocated(By.xpath(xpath)), 15000);
+    let button = await driver.findElement(By.xpath(xpath))
+    button.click() // 进入测试页面
+  }
+
   console.log('111111111111111111111111111111');
   await driver.wait(until.elementLocated(By.css(queSelector)), 15000);
   // 可能不存在
@@ -138,7 +143,6 @@ async function handleMaoGaiQuiz( driver, url, id ,num){
 
   let keyWords1 = ['一', '二', '三', '四'];
   let level_1 = 0;
-  let level_2 = 0;
   let fakeQuestionNum = 0;
 
   let answerList = new AnswerList()
@@ -154,6 +158,7 @@ async function handleMaoGaiQuiz( driver, url, id ,num){
     console.log('question---:',question);
     if(keyWords1.indexOf(question[0]) != -1){
       fakeQuestionNum++;
+      level_1+=keyWords1.indexOf(question[0]);
       continue;
     }
     let key = jsonStr[num][level_1][i-fakeQuestionNum]
@@ -163,11 +168,33 @@ async function handleMaoGaiQuiz( driver, url, id ,num){
       let label = answerLabels[j]
       let a =  await answer.getAttribute('value')
       let b =  await label.getText()
-      if(b[0].toLowerCase()==key.answer[0].toLowerCase()){
-        label.click()
-        console.log(a+b);
+      console.log(a+b);
+      if(b.length==1){//pan duan ti
+        if(b==key.answer){
+          await label.click()
+          console.log('chose '+b);
+        }else{
+          continue
+        }
+      }else{//xuan ze ti
+        if(b.replace(/\s*/g,"").replace(".","").substring(1)==key.answer.replace(/\s*/g,"").replace(".","").substring(1)){
+          await label.click()
+          console.log('chose '+b);
+        }
       }
+
     }
+  }
+  console.log('nextPage----:',nextPage);
+  console.log('submitPage----:',submitPage);
+
+  if(nextPage){
+    console.log('=======has nextPage=======');
+    await nextPage.click()
+    return await handleMaoGaiQuiz( driver, url, id ,num,false)
+  }else if(submitPage){
+    console.log('=======has submitPage=======');
+    await submitPage.click()
   }
 }
 module.exports={

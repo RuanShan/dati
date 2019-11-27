@@ -207,7 +207,7 @@ class Bot {
         } else if (url.includes('/mod/page/view')) {
           await this.readText(lession)
         } else if (url.includes('/mod/quiz/view')) {
-          await this.goQuiz(lession)
+          await this.goQuiz(lession,lession.position)
         } else {
           logger.error(`无法识别的课程url =${url}`)
         }
@@ -271,7 +271,7 @@ class Bot {
       let title = lession.title
       console.log('this.couseCode---:',this.couseCode);
       if (this.couseCode == '3833') {
-        await handleMaoGaiQuiz(driver, url, id ,num)
+        await handleMaoGaiQuiz(driver, url, id ,num,true)
       }
       console.log('this quiz is done');
     }
@@ -360,6 +360,15 @@ class Bot {
       } else if (this.couseCode == '4257') {
         this.couseInfo = await parseCouseMaoGai( this.driver )
       }
+
+      let position = 0;
+      for(let i=0;i<this.couseInfo.status.length;i++){
+        if(this.couseInfo.status[i].type == 'quiz'){
+          this.couseInfo.status[i].position = position;
+          position++;
+        }
+      }
+
       let endAt = new Date()
       this.couseInfo.score.startAt = startAt
       this.couseInfo.score.endAt = endAt
@@ -458,6 +467,7 @@ class Bot {
 
   async saveCouseJson(classId) {
     let filename = await this.getCouseJsonPath(classId)
+    console.log('this.couseInfo----:',this.couseInfo);
     fs.writeFile(filename, JSON.stringify(this.couseInfo), (err) => {
       if (err) throw err;
       console.log(`文件已被保存:${filename}`);
