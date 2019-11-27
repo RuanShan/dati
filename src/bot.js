@@ -271,7 +271,7 @@ class Bot {
       let title = lession.title
       console.log('this.couseCode---:',this.couseCode);
       if (this.couseCode == '3833') {
-        await handleMaoGaiQuiz(driver, url, id ,num)
+        await handleMaoGaiQuiz(driver, url, id ,num,true)
       }
       console.log('this quiz is done');
     }
