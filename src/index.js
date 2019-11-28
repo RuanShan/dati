@@ -104,7 +104,7 @@ async function handleLearnByCodeModule(couseCode, moduleCode,username, password)
   await bot.getLog(username, couseCode)
   await bot.prepareForLearn(couseCode)
   await bot.learnModule(moduleCode)
-  await driver.quit()
+  // await driver.quit()
 }
 
 async function saveUserJson(username, userInfo) {

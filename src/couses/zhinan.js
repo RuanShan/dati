@@ -6,6 +6,7 @@ const {
   Key,
   until
 } = require('selenium-webdriver');
+const {AnswerList} = require ('../makeAnswerJson.js');
 async function parseCouseZhiNan(driver) {
 
   let progressPath = "//div[@class='progress-bar']/span"
@@ -94,6 +95,111 @@ async function parseCouseZhiNan(driver) {
   return couseJson
 }
 
+async function handleZhiNanQuiz( driver, url, id ,num,isFirstPage){
+  console.log('====================handleZhiNanQuiz================');
+  let xpath = "//div[@class='singlebutton quizstartbuttondiv']//button"
+  //let queXpath = "//div[@class='que truefalse deferredfeedback notyetanswered']"
+  let queSelector = ".que"
+  let nextPageXpath = "//input[@value='下一页']"
+  let prevPageXpath = "//input[@value='上一页']"
+  let submitPageXpath = "//input[@value='结束答题…']"
+  let queContentXpath="//div[@class='qtext']/p"
+  let queAnswerXpath="//div[@class='answer']//input"
+  console.log('isFirstPage-----:',isFirstPage);
+  if(isFirstPage){
+    console.log('==============isFirstPage==============');
+    console.log('url-----:',url);
+    await driver.get(url)
+    await driver.wait(until.elementLocated(By.xpath(xpath)), 15000);
+    let button = await driver.findElement(By.xpath(xpath))
+    button.click() // 进入测试页面
+  }
+
+  console.log('111111111111111111111111111111');
+  await driver.wait(until.elementLocated(By.css(queSelector)), 15000);
+  // 可能不存在
+  const [err1, nextPage] = await awaitWrap(driver.findElement(By.xpath(nextPageXpath)))
+  const [err2, prevPage] = await awaitWrap(driver.findElement(By.xpath(prevPageXpath)))
+  const [err3, submitPage] = await awaitWrap(driver.findElement(By.xpath(submitPageXpath)))
+
+  let questions = await driver.findElements(By.css(queSelector))
+  console.debug( `questions:${questions.length}`)
+
+  let keyWords1 = ['一', '二', '三', '四'];
+  let level_1 = 0;
+  let fakeQuestionNum = 0;
+
+  let answerList = new AnswerList()
+
+  let jsonStr = answerList.makeZhiNanAnswerJson("./db/zhinan.txt")
+  let keynum = 0
+  for (let i = 0; i < questions.length; i++) {
+    let questionEle = questions[i];
+    let content = await questionEle.findElement(By.css('.qtext p,.qtext li'))
+    let answerInputs = await questionEle.findElements(By.css('.answer input[type=checkbox],.answer input[type=radio]'))
+    let answerLabels = await questionEle.findElements(By.css('.answer label'))
+
+    let question = await content.getText()
+    console.log('question---:',question);
+    if(keyWords1.indexOf(question[0]) != -1){
+      keynum = 0;
+      level_1+=keyWords1.indexOf(question[0]);
+      continue;
+    }
+    console.log('jsonStr['+num+']['+level_1+']---:',jsonStr[num][level_1]);
+    console.log('keynum-fakeQuestionNum====:',keynum);
+    let key = jsonStr[num][level_1][keynum-fakeQuestionNum]
+    console.log('key---:',key);
+    for( let j = 0; j< answerInputs.length; j++){
+      let answer = answerInputs[j];
+      let label = answerLabels[j]
+      let a =  await answer.getAttribute('value')
+      let b =  await label.getText()
+      console.log('label--:',b);
+      if(b.length==1){//pan duan ti
+        if(b==key.answer[2]){
+          await label.click()
+          console.log('chose '+b);
+        }else{
+          continue
+        }
+      }else{//xuan ze ti
+        let answerStr = key.answer.replace(/\s*/g,"").replace(".","").substring(1);
+        let labelStr = b.replace(/\s*/g,"").replace(".","").substring(1)
+        if(answerStr.indexOf(labelStr)!=-1||answerStr=='全部'){
+          console.log('chose '+b);
+          console.log('type--:',await answer.getAttribute('type'));
+          console.log('checked--:',await answer.getAttribute('checked'));
+          if(await answer.getAttribute('type')=='checkbox'&&await answer.getAttribute('checked')){
+            continue;
+          }else{
+            await answer.click()
+          }
+        }
+      }
+
+    }
+    keynum++;
+  }
+  console.log('nextPage----:',nextPage);
+  console.log('submitPage----:',submitPage);
+
+  if(nextPage){
+    console.log('=======has nextPage=======');
+    await nextPage.click()
+    return await handleMaoGaiQuiz( driver, url, id ,num,false)
+  }else if(submitPage){
+    console.log('=======has submitPage=======');
+    await submitPage.click()
+  }
+}
+
+const awaitWrap = (promise) => {
+ return promise
+  .then(data => [null, data])
+  .catch(err => [err, null])
+}
 module.exports={
-  parseCouseZhiNan
+  parseCouseZhiNan,
+  handleZhiNanQuiz
 }

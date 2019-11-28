@@ -46,7 +46,7 @@ const CouseUrlMap = {
 }
 
 const { parseCouseMaoGai, handleMaoGaiQuiz } = require('./couses/maogai')
-const { parseCouseZhiNan } = require('./couses/zhinan')
+const { parseCouseZhiNan, handleZhiNanQuiz } = require('./couses/zhinan')
 
 class Bot {
 
@@ -272,6 +272,8 @@ class Bot {
       console.log('this.couseCode---:',this.couseCode);
       if (this.couseCode == '3833') {
         await handleMaoGaiQuiz(driver, url, id ,num,true)
+      }else if(this.couseCode == '4125'){
+        await handleZhiNanQuiz(driver, url, id ,num,true)
       }
       console.log('this quiz is done');
     }
