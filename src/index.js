@@ -108,7 +108,7 @@ async function handleLearnByCodeModule(couseCode, moduleCode,username, password)
 }
 
 async function saveUserJson(username, userInfo) {
-  let filename =  './db/' + username  + '.json'
+  let filename =  './db/students/' + username  + '.json'
   fs.writeFile(filename, JSON.stringify(userInfo), (err) => {
     if (err) throw err;
     console.log(`文件已被保存:${filename}`);
