@@ -48,6 +48,7 @@ const CouseUrlMap = {
 const { parseCouseMaoGai, handleMaoGaiQuiz } = require('./couses/maogai')
 const { parseCouseZhiNan, handleZhiNanQuiz } = require('./couses/zhinan')
 const { parseCouseSiXiu, handleSiXiuQuiz } = require('./couses/sixiu')
+const { parseCouseMao, handleMaoQuiz } = require('./couses/mao')
 
 class Bot {
 
@@ -277,6 +278,8 @@ class Bot {
         await handleZhiNanQuiz(driver, url, id ,num,true)
       }else if(this.couseCode == '4257'){
         await handleSiXiuQuiz(driver, url, id ,num,true)
+      }else if(this.couseCode == '4255'){
+        await handleMaoQuiz(driver, url, id ,num,true)
       }
       console.log('this quiz is done');
     }
@@ -290,14 +293,23 @@ class Bot {
     let driver = this.driver
     let mainHandle = await driver.getWindowHandle()
     let links = await this.getCousesLinks(driver);
-    links.forEach(async (a) => {
+    for(let i=0;i<links.length;i++){
+      let a = links[i];
       let displayed = await a.isDisplayed()
       console.log(" isDisplayed ", displayed)
       if (displayed) {
         await a.click()
         // 打开课程窗口
       }
-    })
+    }
+    // links.forEach(async (a) => {
+    //   let displayed = await a.isDisplayed()
+    //   console.log(" isDisplayed ", displayed)
+    //   if (displayed) {
+    //     await a.click()
+    //     // 打开课程窗口
+    //   }
+    // })
     console.log('all tab opened0, links', links.length);
 
     await driver.wait(async () => {
