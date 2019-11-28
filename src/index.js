@@ -54,7 +54,7 @@ async function handleCreateLog(couseCode, username, password ) {
   await bot.login(username, password)
   await bot.prepareForLearn(couseCode)
   await bot.profileCouse(couseCode)
-  await driver.quit()
+  // await driver.quit()
 }
 
 // 学习多门课程
