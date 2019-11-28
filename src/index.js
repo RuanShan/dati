@@ -71,8 +71,13 @@ async function handleLearnCourses(couseCodes, username, password) {
   await bot.prepareForLearn()
   for( let i=0; i<couseCodes.length; i++){
     let couseCode = couseCodes[i]
-    await bot.getLog(username, couseCode)
-    await bot.learnCourse()
+    let log = await bot.getLog(username, couseCode)
+    if( log ){
+      await bot.learnCourse()
+    }else{
+      //throw  new Error( "用户名和密码是必须的")
+      console.error(" can not find couse log by code "+ couseCode )
+    }
   }
 
   await driver.quit()
