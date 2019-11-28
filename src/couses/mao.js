@@ -6,7 +6,7 @@ const {
   Key,
   until
 } = require('selenium-webdriver');
-const {AnswerList} = require ('../makeAnswerJson.js');
+const {answers} = require ('../../db/answers/maoList.json');
 async function parseCouseMao(driver) {
 
   let progressPath = "//div[@class='progress-bar']/span"
@@ -129,9 +129,9 @@ async function handleMaoQuiz( driver, url, id ,num,isFirstPage){
   let level_1 = 0;
   let fakeQuestionNum = 0;
 
-  let answerList = new AnswerList()
-
-  let jsonStr = answerList.makeMaoAnswerJson("./db/answers/mao.txt")
+  let jsonStr = answers
+  console.log(typeof(jsonStr));
+  console.log('jsonStr---:',jsonStr);
   let keynum = 0
   for (let i = 0; i < questions.length; i++) {
     let questionEle = questions[i];

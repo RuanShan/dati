@@ -54,6 +54,7 @@ async function handleCreateLog(couseCode, username, password ) {
   await bot.login(username, password)
   await bot.prepareForLearn(couseCode)
   await bot.profileCouse(couseCode)
+  await bot.createAnswerList(couseCode)
   // await driver.quit()
 }
 

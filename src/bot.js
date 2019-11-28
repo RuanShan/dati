@@ -35,6 +35,7 @@ const LessionStateEnum = {
   completed: '完成'
 }
 const logger = log4js.getLogger();
+const {AnswerList} = require ('./makeAnswerJson.js');
 
 // const { getVerifyCode }  = require('./ocr')
 // 每个学生来自不同地方，可能url不同
@@ -500,7 +501,35 @@ class Bot {
     let filename = dir + '/' + this.username + '_' + couseCode + '.json'
     return filename
   }
+
+  async createAnswerList(couseCode){
+    let answerList = new AnswerList()
+    let jsonStr =''
+    let filename = ''
+    if (couseCode == '3833') {
+      jsonStr = answerList.makeMaoAnswerJson("./db/answers/maogai.txt")
+      filename = './db/answers/maogaiList.json'
+    }else if(couseCode == '4125'){
+      let answerList = new AnswerList()
+      jsonStr = answerList.makeMaoAnswerJson("./db/answers/zhinan.txt")
+      filename = './db/answers/zhinanList.json'
+    }else if(couseCode == '4257'){
+      let answerList = new AnswerList()
+      jsonStr = answerList.makeMaoAnswerJson("./db/answers/sixiu.txt")
+      filename = './db/answers/sixiuList.json'
+    }else if(couseCode == '4255'){
+      let answerList = new AnswerList()
+      jsonStr = answerList.makeMaoAnswerJson("./db/answers/mao.txt")
+      filename = './db/answers/maoList.json'
+    }
+    fs.writeFile(filename, JSON.stringify({answers:jsonStr}), (err) => {
+      if (err) throw err;
+      console.log(`文件已被保存:${filename}`);
+    });
+  }
 }
+
+
 
 
 // async function handleVerifyCode(driver) {
