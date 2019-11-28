@@ -14,5 +14,5 @@ debug.log
 dati.exe
 eng.traineddata
 app.log
-db/
+db/students
 dist.zip
