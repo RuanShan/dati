@@ -1,11 +1,12 @@
 
-// 毛泽东思想和中国特色社会主义理论体系概论
+// 国家开放大学学习指南
 const {
   Builder,
   By,
   Key,
   until
 } = require('selenium-webdriver');
+const {AnswerList} = require ('../makeAnswerJson.js');
 async function parseCouseSiXiu(driver) {
 
   let progressPath = "//div[@class='progress-bar']/span"
@@ -15,6 +16,7 @@ async function parseCouseSiXiu(driver) {
   let sectionl2LinkCss = "a"
   await driver.wait(until.elementLocated(By.className('progress-bar')), 10000);
 
+  let title = await driver.getTitle()
   let url = await driver.getCurrentUrl()
   console.log('url----------------:', url);
   let classId = url.substring(url.indexOf('id=') + 3);
@@ -27,6 +29,7 @@ async function parseCouseSiXiu(driver) {
 
   let status = []
   let classinfo = {
+    title: title,
     url: url,
     classId: classId,
     progress: progress
@@ -55,9 +58,17 @@ async function parseCouseSiXiu(driver) {
       let id = await b.getAttribute('id')
       let imgs = await b.findElements(By.tagName('img'))
       let alt = "未完成"
+      let type = 'unkonwn' // text, video, quiz
       let href = ''
-      // 根据图片1判断学习内容类型
       if (imgs.length >= 2) {
+        let src = await imgs[0].getAttribute('src')
+        if( src.includes('core_h.png')){
+          type = 'video'
+        }else if( src.includes('quiz_h.png')){
+          type = 'quiz'
+        }else if( src.includes('page_h.png')){
+          type = 'page'
+        }
         // 由于前面的内容没有学习，可能没有链接元素，后面没有圆圈图片
         alt = await imgs[1].getAttribute('alt')
         let link = await b.findElement(By.css(sectionl2LinkCss))
@@ -65,6 +76,7 @@ async function parseCouseSiXiu(driver) {
       }
       let course = {
         title: text,
+        type: type,
         isFinish: alt.substring(0, 3),
         url: href,
         id: id.substring(7)
@@ -83,54 +95,112 @@ async function parseCouseSiXiu(driver) {
   return couseJson
 }
 
-// 抽离成公共方法
-const awaitWrap = (promise) => {
- return promise
-  .then(data => [null, data])
-  .catch(err => [err, null])
-}
-
-async function handleMaoGaiQuiz( driver, url, id ){
+async function handleSiXiuQuiz( driver, url, id ,num,isFirstPage){
+  console.log('====================handleSiXiuQuiz================');
   let xpath = "//div[@class='singlebutton quizstartbuttondiv']//button"
   //let queXpath = "//div[@class='que truefalse deferredfeedback notyetanswered']"
-  let queSelector = ".que.notyetanswered"
+  let queSelector = ".que"
   let nextPageXpath = "//input[@value='下一页']"
   let prevPageXpath = "//input[@value='上一页']"
   let submitPageXpath = "//input[@value='结束答题…']"
   let queContentXpath="//div[@class='qtext']/p"
   let queAnswerXpath="//div[@class='answer']//input"
-  await driver.get(url)
-  await driver.wait(until.elementLocated(By.xpath(xpath)), 15000);
-  let button = await driver.findElement(By.xpath(xpath))
-  button.click() // 进入测试页面
+  console.log('isFirstPage-----:',isFirstPage);
+  if(isFirstPage){
+    console.log('==============isFirstPage==============');
+    console.log('url-----:',url);
+    await driver.get(url)
+    await driver.wait(until.elementLocated(By.xpath(xpath)), 15000);
+    let button = await driver.findElement(By.xpath(xpath))
+    button.click() // 进入测试页面
+  }
+
+  console.log('111111111111111111111111111111');
   await driver.wait(until.elementLocated(By.css(queSelector)), 15000);
   // 可能不存在
   const [err1, nextPage] = await awaitWrap(driver.findElement(By.xpath(nextPageXpath)))
   const [err2, prevPage] = await awaitWrap(driver.findElement(By.xpath(prevPageXpath)))
   const [err3, submitPage] = await awaitWrap(driver.findElement(By.xpath(submitPageXpath)))
+
   let questions = await driver.findElements(By.css(queSelector))
   console.debug( `questions:${questions.length}`)
 
+  let keyWords1 = ['一', '二', '三', '四'];
+  let level_1 = 0;
+  let fakeQuestionNum = 0;
+
+  let answerList = new AnswerList()
+
+  let jsonStr = answerList.makeSiXiuAnswerJson("./db/answers/sixiu.txt")
+  let keynum = 0
   for (let i = 0; i < questions.length; i++) {
     let questionEle = questions[i];
-    let content = await questionEle.findElement(By.css('.qtext p'))
-    let answerInputs = await questionEle.findElements(By.css('.answer input'))
+    let content = await questionEle.findElement(By.css('.qtext p,.qtext li'))
+    let answerInputs = await questionEle.findElements(By.css('.answer input[type=checkbox],.answer input[type=radio]'))
     let answerLabels = await questionEle.findElements(By.css('.answer label'))
-    let question = await content.getText()
-    // answers[0] = 对 answers[1] = 错
-    let answers = []
 
+    let question = await content.getText()
+    console.log('question---:',question);
+    if(keyWords1.indexOf(question[0]) != -1){
+      keynum = 0;
+      level_1+=keyWords1.indexOf(question[0]);
+      continue;
+    }
+    console.log('keynum-fakeQuestionNum====:',keynum);
+    let key = jsonStr[num][level_1][keynum-fakeQuestionNum]
+    console.log('key---:',key);
     for( let j = 0; j< answerInputs.length; j++){
       let answer = answerInputs[j];
       let label = answerLabels[j]
       let a =  await answer.getAttribute('value')
-      let b =  await label.getText( )
-      answers.push( a+b )
+      let b =  await label.getText()
+      console.log('label--:',b);
+      if(b.length==1){//pan duan ti
+        if(b==key.answer){
+          await label.click()
+          console.log('chose '+b);
+        }else{
+          continue
+        }
+      }else{//xuan ze ti
+        let answerStr = key.answer.replace(/\s*/g,"").replace(".","").replace("''","");
+        console.log('answerStr-----:',answerStr);
+        let labelStr = b.replace(/\s*/g,"").replace(".","").substring(1)
+        console.log('labelStr---:',labelStr);
+        if(answerStr.indexOf(labelStr)!=-1||answerStr=='全部'){
+          console.log('chose '+b);
+          console.log('type--:',await answer.getAttribute('type'));
+          console.log('checked--:',await answer.getAttribute('checked'));
+          if(await answer.getAttribute('type')=='checkbox'&&await answer.getAttribute('checked')){
+            continue;
+          }else{
+            await answer.click()
+          }
+        }
+      }
+
     }
-    console.debug( `question: ${question}, answer: ${answerInputs.length} ${answers}`);
+    keynum++;
+  }
+  console.log('nextPage----:',nextPage);
+  console.log('submitPage----:',submitPage);
+
+  if(nextPage){
+    console.log('=======has nextPage=======');
+    await nextPage.click()
+    return await handleSiXiuQuiz( driver, url, id ,num,false)
+  }else if(submitPage){
+    console.log('=======has submitPage=======');
+    await submitPage.click()
   }
 }
+
+const awaitWrap = (promise) => {
+ return promise
+  .then(data => [null, data])
+  .catch(err => [err, null])
+}
 module.exports={
-  parseCouseMaoGai,
-  handleMaoGaiQuiz
+  parseCouseSiXiu,
+  handleSiXiuQuiz
 }

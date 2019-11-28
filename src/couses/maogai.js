@@ -147,7 +147,7 @@ async function handleMaoGaiQuiz( driver, url, id ,num,isFirstPage){
 
   let answerList = new AnswerList()
 
-  let jsonStr = answerList.makeXiAnswerJson("./db/xi.txt")
+  let jsonStr = answerList.makeXiAnswerJson("./db/answers/xi.txt")
 
   for (let i = 0; i < questions.length; i++) {
     let questionEle = questions[i];

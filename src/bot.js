@@ -47,6 +47,7 @@ const CouseUrlMap = {
 
 const { parseCouseMaoGai, handleMaoGaiQuiz } = require('./couses/maogai')
 const { parseCouseZhiNan, handleZhiNanQuiz } = require('./couses/zhinan')
+const { parseCouseSiXiu, handleSiXiuQuiz } = require('./couses/sixiu')
 
 class Bot {
 
@@ -274,6 +275,8 @@ class Bot {
         await handleMaoGaiQuiz(driver, url, id ,num,true)
       }else if(this.couseCode == '4125'){
         await handleZhiNanQuiz(driver, url, id ,num,true)
+      }else if(this.couseCode == '4257'){
+        await handleSiXiuQuiz(driver, url, id ,num,true)
       }
       console.log('this quiz is done');
     }
@@ -477,7 +480,7 @@ class Bot {
   }
 
   async getCouseJsonPath(couseCode) {
-    let dir = './db'
+    let dir = './db/students'
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir)
     }

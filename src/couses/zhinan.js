@@ -131,7 +131,7 @@ async function handleZhiNanQuiz( driver, url, id ,num,isFirstPage){
 
   let answerList = new AnswerList()
 
-  let jsonStr = answerList.makeZhiNanAnswerJson("./db/zhinan.txt")
+  let jsonStr = answerList.makeZhiNanAnswerJson("./db/answers/zhinan.txt")
   let keynum = 0
   for (let i = 0; i < questions.length; i++) {
     let questionEle = questions[i];
@@ -187,7 +187,7 @@ async function handleZhiNanQuiz( driver, url, id ,num,isFirstPage){
   if(nextPage){
     console.log('=======has nextPage=======');
     await nextPage.click()
-    return await handleMaoGaiQuiz( driver, url, id ,num,false)
+    return await handleZhiNanQuiz( driver, url, id ,num,false)
   }else if(submitPage){
     console.log('=======has submitPage=======');
     await submitPage.click()
