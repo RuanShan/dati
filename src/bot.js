@@ -153,7 +153,8 @@ class Bot {
           await this.readText(lession)
           isFinish = '完成'
         } else if (url.includes('/mod/quiz/view')) {
-          await this.goQuiz(lession)
+          await this.goQuiz(lession,lession.position)
+          isFinish = '完成'
         } else {
           logger.error(`无法识别的课程url =${url}`)
         }
