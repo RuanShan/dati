@@ -60,7 +60,7 @@ async function parseCouseZhiNan(driver) {
       let alt = "未完成"
       let type = 'unkonwn' // text, video, quiz
       let href = ''
-      if (imgs.length >= 2) {
+      if (imgs.length >= 1){
         let src = await imgs[0].getAttribute('src')
         if( src.includes('core_h.png')){
           type = 'video'
@@ -69,6 +69,8 @@ async function parseCouseZhiNan(driver) {
         }else if( src.includes('page_h.png')){
           type = 'page'
         }
+      }
+      if (imgs.length >= 2) {
         // 由于前面的内容没有学习，可能没有链接元素，后面没有圆圈图片
         alt = await imgs[1].getAttribute('alt')
         let link = await b.findElement(By.css(sectionl2LinkCss))

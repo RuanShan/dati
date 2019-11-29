@@ -68,7 +68,7 @@ async function parseCouseMaoGai(driver) {
       // http://anhui.ouchn.cn/theme/blueonionre/pix/page_h.png
       // http://anhui.ouchn.cn/theme/blueonionre/pix/core_h.png
       // http://anhui.ouchn.cn/theme/blueonionre/pix/quiz_h.png
-      if (imgs.length >= 2) {
+      if (imgs.length >= 1){
         // 每节课前面的图标
         let src = await imgs[0].getAttribute('src')
         if( src.includes('core_h.png')){
@@ -78,7 +78,9 @@ async function parseCouseMaoGai(driver) {
         }else if( src.includes('page_h.png')){
           type = 'page'
         }
+      }
 
+      if (imgs.length >= 2) {
         // 由于前面的内容没有学习，可能没有链接元素，后面没有圆圈图片
         alt = await imgs[1].getAttribute('alt')
         let link = await b.findElement(By.css(sectionl2LinkCss))
