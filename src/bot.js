@@ -507,15 +507,15 @@ class Bot {
     let jsonStr =''
     let filename = ''
     if (couseCode == '3833') {
-      jsonStr = answerList.makeMaoAnswerJson("./db/answers/maogai.txt")
-      filename = './db/answers/maogaiList.json'
+      jsonStr = answerList.makeXiAnswerJson("./db/answers/xi.txt")
+      filename = './db/answers/xiList.json'
     }else if(couseCode == '4125'){
       let answerList = new AnswerList()
-      jsonStr = answerList.makeMaoAnswerJson("./db/answers/zhinan.txt")
+      jsonStr = answerList.makeZhiNanAnswerJson("./db/answers/zhinan.txt")
       filename = './db/answers/zhinanList.json'
     }else if(couseCode == '4257'){
       let answerList = new AnswerList()
-      jsonStr = answerList.makeMaoAnswerJson("./db/answers/sixiu.txt")
+      jsonStr = answerList.makeSiXiuAnswerJson("./db/answers/sixiu.txt")
       filename = './db/answers/sixiuList.json'
     }else if(couseCode == '4255'){
       let answerList = new AnswerList()

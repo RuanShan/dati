@@ -7,7 +7,7 @@ const {
   until
 } = require('selenium-webdriver');
 
-const {AnswerList} = require ('../makeAnswerJson.js');
+const {answers} = require ('../../db/answers/xiList.json');
 
 async function parseCouseMaoGai(driver) {
 
@@ -145,9 +145,8 @@ async function handleMaoGaiQuiz( driver, url, id ,num,isFirstPage){
   let level_1 = 0;
   let fakeQuestionNum = 0;
 
-  let answerList = new AnswerList()
-
-  let jsonStr = answerList.makeXiAnswerJson("./db/answers/xi.txt")
+  let jsonStr = answers
+  // let jsonStr = ''
 
   for (let i = 0; i < questions.length; i++) {
     let questionEle = questions[i];

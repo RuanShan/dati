@@ -6,7 +6,7 @@ const {
   Key,
   until
 } = require('selenium-webdriver');
-const {AnswerList} = require ('../makeAnswerJson.js');
+const {answers} = require ('../../db/answers/zhinanList.json');
 async function parseCouseZhiNan(driver) {
 
   let progressPath = "//div[@class='progress-bar']/span"
@@ -129,9 +129,8 @@ async function handleZhiNanQuiz( driver, url, id ,num,isFirstPage){
   let level_1 = 0;
   let fakeQuestionNum = 0;
 
-  let answerList = new AnswerList()
-
-  let jsonStr = answerList.makeZhiNanAnswerJson("./db/answers/zhinan.txt")
+  let jsonStr = answers
+  // let jsonStr = ''
   let keynum = 0
   for (let i = 0; i < questions.length; i++) {
     let questionEle = questions[i];

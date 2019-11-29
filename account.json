@@ -1,5 +1,7 @@
 {
-  "accounts":[
-    { "user": "1934001474083", "password": "20010416", "realname": "徐天天"}
-  ]
+  "accounts": [{
+    "user": "1934001474055",
+    "password": "19980324",
+    "realname": "李锦涛"
+  }]
 }
