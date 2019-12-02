@@ -30,7 +30,7 @@ log4js.configure({
   }
 });
 
-const LessionStateEnum = {
+const lessonStateEnum = {
   initial: '未完成',
   completed: '完成'
 }
@@ -88,28 +88,49 @@ class Bot {
     return filename
   }
 
-  // async handleCouseLinks(couseCode) {
-  //   let driver = this.driver
-  //   let mainHandle = await driver.getWindowHandle()
-  //   let links = await getCousesLinks(driver);
-  //
-  //   console.log('all tab opened, hrefs', hrefs);
-  //   let handles = await driver.getAllWindowHandles()
-  //   console.log("getAllWindowHandles", handles)
-  //
-  //   for (let i = 0; i < handles.length; i++) {
-  //     let handle = handles[i]
-  //     console.log("mainHandle", mainHandle, "handle = ", handle)
-  //     if (mainHandle != handle) {
-  //       let locator = driver.switchTo()
-  //       await locator.window(handle)
-  //       await handleCouse(driver)
-  //     }
-  //   }
-  //
-  // }
+  async readScore(couseCode){
+    let filename = await this.getCouseJsonPath(couseCode)
+    let data = fs.readFileSync(filename, "utf-8")
+    if (data != null) {
+      let res = JSON.parse(data);
+      for(let i = 0; i < res.status.length; i++){
+        let lesson = res.status[i];
+        let isFinish = lesson.isFinish;
+        let type = lesson.type
 
+        if(isFinish=='已完成'&&type=='quiz'){
+          let url = lesson.url
 
+          let xpath = "//div[@class='singlebutton quizstartbuttondiv']//button"
+          await this.driver.get(url)
+          await this.driver.wait(until.elementLocated(By.xpath(xpath)), 15000);
+
+          let scoreTable = await this.driver.findElements(By.tagName('table'))
+          let table_body = await scoreTable[0].findElements(By.tagName('tbody'))
+          let tr = await table_body[0].findElements(By.tagName('tr'))
+          for(let j=0;j<tr.length;j++){
+            let tr_Str = await tr[j].getText()
+            let infoList = tr_Str.split(' ')
+            console.log('infoList---:',infoList);
+            if(j==tr.length-1&&infoList.length>2){
+              res.status[i].score = infoList
+            }else if(j==tr.length-1&&infoList.length==2){
+              tr_Str = await tr[j-1].getText()
+              infoList = tr_Str.split(' ')
+              res.status[i].score = infoList
+            }
+          }
+        }
+      }
+      this.couseInfo.status = res.status
+      fs.writeFile(filename, JSON.stringify(this.couseInfo), (err) => {
+        if (err) throw err;
+        console.log(`文件已被保存:${filename}`);
+      });
+    } else {
+      logger.error(`无法读取课程数据文件 ${filename}`);
+    }
+  }
 
   async login(username, password) {
 
@@ -135,32 +156,32 @@ class Bot {
     let moduleStatus = this.couseInfo.status
 
     for (let i = 0; i < moduleStatus.length; i++) {
-      let lession = moduleStatus[i];
-      let isFinish = lession.isFinish;
-      let url = lession.url
-      let type = lession.type
+      let lesson = moduleStatus[i];
+      let isFinish = lesson.isFinish;
+      let url = lesson.url
+      let type = lesson.type
       if (url.length == 0) {
         continue
       }
       if (isFinish == '未完成') {
-        let title = lession.title
+        let title = lesson.title
         logger.info(`学习小节${title} url=${url}`)
         let done = false
         if ( type== 'video'  ) {
           //http://anhui.ouchn.cn/course/view.php?id=4257&sectionid=91623&mid=561704
-          await this.watchVideo(lession)
+          await this.watchVideo(lesson)
           isFinish = '完成'
         } else if (url.includes('/mod/page/view')) {
-          await this.readText(lession)
+          await this.readText(lesson)
           isFinish = '完成'
         } else if (url.includes('/mod/quiz/view')) {
-          await this.goQuiz(lession,lession.position)
+          await this.goQuiz(lesson,lesson.position)
           isFinish = '完成'
         } else {
           logger.error(`无法识别的课程url =${url}`)
         }
         // 每学完一课，更新一下数据文件
-        lession.isFinish = isFinish
+        lesson.isFinish = isFinish
         if( isFinish== '完成'){
           this.saveCouseJson(this.couseCode)
         }
@@ -189,16 +210,16 @@ class Bot {
     let moduleStatus = this.couseInfo.status
 
     for (let i = 0; i < moduleStatus.length; i++) {
-      let lession = moduleStatus[i];
-      let title = lession.title
-      let isFinish = lession.isFinish;
-      let type = lession.type
-      let url = lession.url
+      let lesson = moduleStatus[i];
+      let title = lesson.title
+      let isFinish = lesson.isFinish;
+      let type = lesson.type
+      let url = lesson.url
       if (url.length == 0) {
         console.debug(`小节 ${title} 没有 url`);
         continue
       }
-      if (isFinish == '未完成' && lession.id == moduleCode) {
+      if (isFinish == '未完成' && lesson.id == moduleCode) {
         // 根据url判断类型
         // 视频|外部文章：mod/url/view
         // 文本: mod/page/view
@@ -207,11 +228,11 @@ class Bot {
         console.debug(`类型 ${type} 小节 ${title} `);
         if ( type== 'video'  ) {
           //http://anhui.ouchn.cn/course/view.php?id=4257&sectionid=91623&mid=561704
-          await this.watchVideo(lession)
+          await this.watchVideo(lesson)
         } else if (url.includes('/mod/page/view')) {
-          await this.readText(lession)
+          await this.readText(lesson)
         } else if (url.includes('/mod/quiz/view')) {
-          await this.goQuiz(lession,lession.position)
+          await this.goQuiz(lesson,lesson.position)
         } else {
           logger.error(`无法识别的课程url =${url}`)
         }
@@ -224,16 +245,16 @@ class Bot {
   }
 
 
-  async readText(lession) {
+  async readText(lesson) {
     var driver = this.driver
 
 
-    let isFinish = lession.isFinish;
-    let id = lession.id
+    let isFinish = lesson.isFinish;
+    let id = lesson.id
 
     if (isFinish == '未完成') {
-      let url = lession.url
-      let title = lession.title
+      let url = lesson.url
+      let title = lesson.title
 
       await driver.get(url);
       console.debug('reading ', title);
@@ -244,17 +265,17 @@ class Bot {
 
   }
 
-  async watchVideo(lession) {
+  async watchVideo(lesson) {
     console.log('==================watchVideo=================');
 
     let driver = this.driver
-    let isFinish = lession.isFinish;
-    let id = lession.id
+    let isFinish = lesson.isFinish;
+    let id = lesson.id
 
     if (isFinish == '未完成') {
-      console.log('course-----:', lession);
-      let url = lession.url
-      let title = lession.title
+      console.log('course-----:', lesson);
+      let url = lesson.url
+      let title = lesson.title
       await driver.get(url);
       let canvas = await driver.findElement(By.tagName('canvas'))
       console.log('this video is start');
@@ -264,15 +285,15 @@ class Bot {
 
   }
 
-  async goQuiz(lession,num){
+  async goQuiz(lesson,num){
     let driver = this.driver
-    let isFinish = lession.isFinish;
-    let id = lession.id
+    let isFinish = lesson.isFinish;
+    let id = lesson.id
 
     if (isFinish == '未完成') {
-      console.log('course-----:', lession);
-      let url = lession.url
-      let title = lession.title
+      console.log('course-----:', lesson);
+      let url = lesson.url
+      let title = lesson.title
       console.log('this.couseCode---:',this.couseCode);
       if (this.couseCode == '3833') {
         await handleMaoGaiQuiz(driver, url, id ,num,true)

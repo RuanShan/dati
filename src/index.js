@@ -55,7 +55,18 @@ async function handleCreateLog(couseCode, username, password ) {
   await bot.prepareForLearn(couseCode)
   await bot.profileCouse(couseCode)
   await bot.createAnswerList(couseCode)
-  // await driver.quit()
+  await driver.quit()
+}
+
+async function handleReadScore(couseCode, username, password){
+  let driver = await new Builder().forBrowser('chrome').build();
+  let bot = new Bot(driver)
+  console.log(" bot doing handleReadScore")
+  await bot.login(username, password)
+  await bot.prepareForLearn(couseCode)
+  await bot.readScore(couseCode)
+  await driver.quit()
+
 }
 
 // 学习多门课程
@@ -126,5 +137,6 @@ module.exports = {
   handleCreateLog,
   handleLearnCourse,
   handleLearnCourses,
-  handleLearnByCodeModule
+  handleLearnByCodeModule,
+  handleReadScore
 }
