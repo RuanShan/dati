@@ -58,6 +58,8 @@ const { parseCouseMaoGai, handleMaoGaiQuiz } = require('./couses/maogai')
 const { parseCouseZhiNan, handleZhiNanQuiz } = require('./couses/zhinan')
 const { parseCouseSiXiu, handleSiXiuQuiz } = require('./couses/sixiu')
 const { parseCouseMao, handleMaoQuiz } = require('./couses/mao')
+const { parseCouseMaKeSi, handleMaKeSiQuiz } = require('./couses/makesi')
+const { parseCouseJinDaiShi, handleJinDaiShiQuiz } = require('./couses/jindaishi')
 
 class Bot {
 
@@ -364,6 +366,10 @@ class Bot {
         await handleSiXiuQuiz(driver, url, id ,num,true)
       }else if(title == '毛泽东思想和中国特色社会主义理论体系概论'){
         await handleMaoQuiz(driver, url, id ,num,true)
+      }else if (title == '马克思主义基本原理概论') {
+        await handleMaKeSiQuiz(driver, url, id ,num,true)
+      }else if (title == '中国近现代史纲要'){
+        await handleJinDaiShiQuiz(driver, url, id ,num,true)
       }
       console.log('this quiz is done');
     }
@@ -480,7 +486,9 @@ class Bot {
       } else if (title == '思想道德修养与法律基础') {
         this.couseInfo = await parseCouseMaoGai( this.driver )
       } else if (title == '中国近现代史纲要') {
-        this.couseInfo = await parseCouseMaoGai( this.driver )
+        this.couseInfo = await parseCouseJinDaiShi( this.driver )
+      }else if (title == '马克思主义基本原理概论') {
+        this.couseInfo = await parseCouseMaKeSi( this.driver )
       }
       let position = 0;
       for(let i=0;i<this.couseInfo.status.length;i++){
@@ -567,6 +575,14 @@ class Bot {
         let answerList = new AnswerList()
         jsonStr = answerList.makeMaoAnswerJson("./db/answers/mao.txt")
         filename = './db/answers/maoList.json'
+      }else if(title == '马克思主义基本原理概论'){
+        let answerList = new AnswerList()
+        jsonStr = answerList.makeMaoAnswerJson("./db/answers/makesi.txt")
+        filename = './db/answers/makesiList.json'
+      }else if(title == '中国近现代史纲要'){
+        let answerList = new AnswerList()
+        jsonStr = answerList.makeJinDaiShiAnswerJson("./db/answers/jindaishi.txt")
+        filename = './db/answers/jindaishiList.json'
       }
       if( filename ){
         fs.writeFile(filename, JSON.stringify({answers:jsonStr}), (err) => {

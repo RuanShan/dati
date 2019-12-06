@@ -59,7 +59,7 @@ async function handleCreateLog(couseCode, username, password ) {
   await bot.prepareForLearn(couseCode)
   await bot.profileCouse(couseCode)
   await bot.createAnswerList(couseCode)
-  await driver.quit()
+  // await driver.quit()
 }
 
 async function handleReadScore(couseCode, username, password){
