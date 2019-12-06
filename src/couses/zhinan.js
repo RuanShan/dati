@@ -62,7 +62,7 @@ async function parseCouseZhiNan(driver) {
       let href = ''
       if (imgs.length >= 1){
         let src = await imgs[0].getAttribute('src')
-        if( src.includes('core_h.png')){
+        if( src.includes('core_h.png') && text.includes('视频') ){ //视频1：新时代党的建设总要求网页地址
           type = 'video'
         }else if( src.includes('quiz_h.png')){
           type = 'quiz'
