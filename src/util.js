@@ -61,6 +61,7 @@ async function playVideo(driver, canvas) {
 }
 
 
+
 function playVideoTimeout(video) {
   console.log("video is over")
   return true

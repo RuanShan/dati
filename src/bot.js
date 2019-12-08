@@ -73,11 +73,11 @@ class Bot {
     this.driver = driver;
     this.username = options.username
     this.password = ''
-    this.couseCode = '' // 当前课程代码，不同省市同一
+    this.courseCode = '' // 当前课程代码，不同省市同一
     this.couseTitle = '' // 当前课程名称
     this.couseUrl = '' // 当前课程URL
     this.recursiveCount = 0 // 课程学习递归调用次数
-    this.couseInfo = {
+    this.courseInfo = {
       score:{progress: 0},
       status: []
     } // 课程学习状态
@@ -94,7 +94,7 @@ class Bot {
 
         let res = JSON.parse(data);
         console.info(`读取课程数据 ${couseTitle}`);
-        that.couseInfo= res;
+        that.courseInfo= res;
       }
     } else {
       logger.error(`无法读取课程数据文件 ${filename}`);
@@ -138,8 +138,8 @@ class Bot {
           }
         }
       }
-      this.couseInfo.status = res.status
-      fs.writeFile(filename, JSON.stringify(this.couseInfo), (err) => {
+      this.courseInfo.status = res.status
+      fs.writeFile(filename, JSON.stringify(this.courseInfo), (err) => {
         if (err) throw err;
         console.log(`文件已被保存:${filename}`);
       });
@@ -148,6 +148,11 @@ class Bot {
     }
   }
 
+  /**
+   * 登录账户
+   * @param {Object} options - type - 学习某一类型的章节
+   * @return {bool} 登录是否成功
+   */
   async login(username, password) {
 
     this.username = username
@@ -159,13 +164,25 @@ class Bot {
     await driver.findElement(By.id('password')).sendKeys(password);
     //await handleVerifyCode(driver)
     let loginButton = await driver.findElement(By.css(".login-form button[value='login']"));
-    loginButton.click();
-    await driver.wait(until.titleContains('学生空间'), 100000);
-    await driver.get('http://student.ouchn.cn/#home')
-    //await driver.findElement(By.className('jbox-close')).click();
-    logger.info('登录成功!!');
+    await loginButton.click();
+    let success = false
+    //最多等待15秒
+     try{
+      await driver.wait(until.titleContains('学生空间'), 10000);
+      await driver.get('http://student.ouchn.cn/#home')
+      logger.info('登录成功!!');
+      success = true
+    }catch( e){
+      logger.info('登录失败!!');
+    }
+
+    return success
   }
 
+  async logout(){
+    let url = 'http://passport.ouchn.cn/Account/Logout?logoutId=student.ouchn.cn'
+    await this.driver.get(url)
+  }
   /**
    * 学习一门课程
    * @param {Object} options - type - 学习某一类型的章节
@@ -179,7 +196,7 @@ class Bot {
     console.info("课程学习中", this.couseTitle, 'options=', options)
     this.recursiveCount += 1
     let driver = this.driver
-    let moduleStatus = this.couseInfo.status
+    let moduleStatus = this.courseInfo.status
     let nourlModules = moduleStatus.filter((moduleStatus) => {
       return moduleStatus.isFinish == '未完成'
     })
@@ -233,7 +250,7 @@ class Bot {
         logger.info(`课程${ this.couseTitle}递归了${this.recursiveCount}次，还没有完成。`)
         await this.profileCouse( )
 
-        let newModuleStatus = this.couseInfo.status
+        let newModuleStatus = this.courseInfo.status
         let newNourlModules = moduleStatus.filter((moduleStatus) => {
           return moduleStatus.isFinish == '未完成'
         })
@@ -260,7 +277,7 @@ class Bot {
   async learnModule(moduleCode) {
     logger.info(`课程${ this.couseTitle} 小节 ${moduleCode} 开始学习。`)
     let driver = this.driver
-    let moduleStatus = this.couseInfo.status
+    let moduleStatus = this.courseInfo.status
 
     for (let i = 0; i < moduleStatus.length; i++) {
       let lesson = moduleStatus[i];
@@ -281,7 +298,7 @@ class Bot {
         console.debug(`类型 ${type} 小节 ${title} `);
         if ( type== 'video'  ) {
           //http://anhui.ouchn.cn/course/view.php?id=4257&sectionid=91623&mid=561704
-          await this.watchVideo(lesson)
+          await this.watchVideoByApi(lesson)
         } else if (url.includes('/mod/page/view')) {
           await this.readText(lesson)
         } else if (url.includes('/mod/quiz/view')) {
@@ -376,6 +393,40 @@ class Bot {
 
 
   }
+
+  // 通过api去看视频
+  async watchVideoByApi(lesson){
+    // $.getJSON('http://shenyang.ouchn.cn/theme/blueonionre/modulesCompletion.php?cmid=437329&id=3935&sectionid=27', function(res){ console.log(res)})
+    console.log('==================watchVideo=================');
+    let success = true
+    let driver = this.driver
+    let isFinish = lesson.isFinish;
+    let id = lesson.id
+    let classId = lesson.classId
+    let sectionId = lesson.sectionId
+    if (isFinish == '未完成') {
+      console.log('course-----:', lesson);
+      let url = lesson.url
+      let title = lesson.title
+      await driver.get(url);
+      // 可能被重定向到 xxx.pdf
+
+      try{
+        let video = await driver.wait(until.elementLocated(By.tagName('video')), 10000);
+        let script = `$.ajaxsettings.async = false; var res = $.getJSON('/theme/blueonionre/modulesCompletion.php?cmid=${id}&id=${classId}&sectionid=${sectionId}'); return res;`
+        let res = await driver.executeScript(script);
+        console.log('视频播放成功', res);
+      }catch(ex){
+        success = false
+        console.error('视频播放失败：'+id, ex);
+      }
+    }
+
+    return success
+
+
+  }
+
   // 当前在主页，打开所有课程页面
   // 确定当前课程的url 和 code
   //需要点击一下 ‘进入学习’，获得访问权限 地区.ouchn.cn/course
@@ -456,14 +507,14 @@ class Bot {
   //
   // }
   // 生成某一门课的db log，需要知道这门课的url
-  async profileCouse(couseCodeOrTitle) {
+  async profileCouse(courseCodeOrTitle) {
     // 毛泽东思想和中国特色社会主义理论体系概论, 统计学原理   思想道德修养与法律基础  管理学基础
     //  经济数学基础  计算机应用基础
-    this.couseTitle = couseCodeOrTitle || this.couseTitle
-    console.debug("profileCouse=", couseCodeOrTitle, CouseUrlMap);
+    this.couseTitle = courseCodeOrTitle || this.couseTitle
+    console.debug("profileCouse=", courseCodeOrTitle, CouseUrlMap);
     let couse = null
-    if( couseCodeOrTitle ){
-      couse = CouseUrlMap[couseCodeOrTitle]
+    if( courseCodeOrTitle ){
+      couse = CouseUrlMap[courseCodeOrTitle]
 
     }else{
       couse = CouseUrlMap[this.couseTitle]
@@ -478,32 +529,32 @@ class Bot {
       let couseTitle = windowTitle.replace('课程： ', '')
       console.log(" tab.title1 ", title, this.couseTitle, typeof(this.couseTitle))
       if (title == '毛泽东思想和中国特色社会主义理论体系概论') {
-        this.couseInfo = await parseCouseMaoGai( this.driver )
+        this.courseInfo = await parseCouseMaoGai( this.driver )
       } else if (title == '国家开放大学学习指南') {
-        this.couseInfo = await parseCouseZhiNan( this.driver )
+        this.courseInfo = await parseCouseZhiNan( this.driver )
       } else if (title == '习近平新时代中国特色社会主义思想') {
-        this.couseInfo = await parseCouseMaoGai( this.driver )
+        this.courseInfo = await parseCouseMaoGai( this.driver )
       } else if (title == '思想道德修养与法律基础') {
-        this.couseInfo = await parseCouseMaoGai( this.driver )
+        this.courseInfo = await parseCouseMaoGai( this.driver )
       } else if (title == '中国近现代史纲要') {
-        this.couseInfo = await parseCouseJinDaiShi( this.driver )
+        this.courseInfo = await parseCouseJinDaiShi( this.driver )
       }else if (title == '马克思主义基本原理概论') {
-        this.couseInfo = await parseCouseMaKeSi( this.driver )
+        this.courseInfo = await parseCouseMaKeSi( this.driver )
       }
       let position = 0;
-      for(let i=0;i<this.couseInfo.status.length;i++){
-        if(this.couseInfo.status[i].type == 'quiz'){
-          this.couseInfo.status[i].position = position;
+      for(let i=0;i<this.courseInfo.status.length;i++){
+        if(this.courseInfo.status[i].type == 'quiz'){
+          this.courseInfo.status[i].position = position;
           position++;
         }
       }
 
       let endAt = new Date()
-      this.couseInfo.score.startAt = startAt
-      this.couseInfo.score.endAt = endAt
+      this.courseInfo.score.startAt = startAt
+      this.courseInfo.score.endAt = endAt
       this.saveCouseJson(this.couseTitle)
     } else {
-      console.debug(`课程代码 ${ this.couseTitle} ${couseCodeOrTitle} 找不到课程url`);
+      console.debug(`课程代码 ${ this.couseTitle} ${courseCodeOrTitle} 找不到课程url`);
     }
   }
 
@@ -535,8 +586,8 @@ class Bot {
 
   async saveCouseJson(classId) {
     let filename = await this.getCouseJsonPath(classId)
-    //console.log('this.couseInfo----:',this.couseInfo);
-    fs.writeFile(filename, JSON.stringify(this.couseInfo), (err) => {
+    //console.log('this.courseInfo----:',this.courseInfo);
+    fs.writeFile(filename, JSON.stringify(this.courseInfo), (err) => {
       if (err) throw err;
       console.log(`文件已被保存:${filename}`);
     });
@@ -599,6 +650,7 @@ class Bot {
 
   }
 
+  // 取得科目的形考成绩
   async getSummary(couseTitles ){
     let driver = this.driver
     let summaries = []
@@ -619,6 +671,7 @@ class Bot {
         let infoElements = await couse.findElements(By.css('.course-content p'));
         let todo = await infoElements[3].getText()
         let score =  await infoElements[1].getText()
+        sumary.username = this.username
         sumary.todo = todo
         sumary.score = score
         console.debug("getSummary couse=",title, text, todo, score);
@@ -628,6 +681,9 @@ class Bot {
     return summaries
 
   }
+
+
+
 }
 
 

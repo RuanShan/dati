@@ -18,8 +18,34 @@ const {
   until
 } = require('selenium-webdriver');
 
+// 检查登录账户是否可用
+async function handleAccountsCheckin(  accounts=[] ) {
+
+  let driver = await new Builder().forBrowser('chrome').build();
+  let bot = new Bot(driver)
+  console.log(" bot doing accounts checkin", accounts.length)
+    // 1934001474084
+    // 19930902
+  let checkins = []
+  for(let i=0; i<accounts.length; i++){
+    let account = accounts[i]
+    let { username, password } = account
+    if( username && username.length>0 && password && password.length>0){
+      let success = await bot.login(username, password)
+      checkins.push( {username, password, checkin: success })
+      await bot.logout()
+      console.log("登录账户: ", i, account.username, success)
+    }
+
+  }
+
+   await driver.quit()
+   let filename =  './db/students/checkin.json'
+   fs.writeFileSync(filename, JSON.stringify(checkins));
+}
+
 // 为课程代码创建数据库
-async function handleCreateDb(couseCodes, username, password ) {
+async function handleCreateDb(courseCodes, username, password ) {
   if( !username || !password){
     throw  new Error( "用户名和密码是必须的")
   }
@@ -31,65 +57,78 @@ async function handleCreateDb(couseCodes, username, password ) {
     // 19930902
   await bot.login(username, password)
   await bot.prepareForLearn()
-  let userInfo = { username, couses:[] }
-  for( let i=0; i<couseCodes.length; i++){
-    let couseCode = couseCodes[i]
+  let userInfo = { username, courses:[] }
+  for( let i=0; i<courseCodes.length; i++){
+    let courseCode = courseCodes[i]
     // 如果这门课的数据文件存在
-    let exists =  isCouseJsonExists( username, couseCode)
+    let exists =  isCouseJsonExists( username, courseCode)
     if( !exists ){
-      await bot.profileCouse(couseCode)
-      userInfo.couses.push( bot.couseInfo.score )
+      await bot.profileCouse(courseCode)
+      userInfo.courses.push( bot.courseInfo.score )
     }
   }
   await saveUserJson( username, userInfo )
   await driver.quit()
 }
 
-async function handleCreateLog(couseCode, username, password ) {
+async function handleCreateLog(courseCode, username, password ) {
   if( !username || !password){
     throw  new Error( "用户名和密码是必须的")
   }
 
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver)
-  console.log(" bot doing profile a couse")
+  console.log(" bot doing profile a course")
     // 1934001474084
     // 19930902
   await bot.login(username, password)
-  await bot.prepareForLearn(couseCode)
-  await bot.profileCouse(couseCode)
-  await bot.createAnswerList(couseCode)
+  await bot.prepareForLearn(courseCode)
+  await bot.profileCouse(courseCode)
+  await bot.createAnswerList(courseCode)
   // await driver.quit()
 }
 
-async function handleReadScore(couseCode, username, password){
+async function handleReadScore(courseCode, username, password){
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver)
   console.log(" bot doing handleReadScore")
   await bot.login(username, password)
-  await bot.prepareForLearn(couseCode)
-  await bot.readScore(couseCode)
+  await bot.prepareForLearn(courseCode)
+  await bot.readScore(courseCode)
   await driver.quit()
 
 }
 
 // 取得课程进度
-async function handleGetCourseSumaries(couseCodes, username, password){
+async function handleGetCourseSumaries(accounts, courseCodes ){
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver)
   console.log(" bot doing handleSumaryCourses")
-  await bot.login(username, password)
 
-  let sumaries = await bot.getSummary(couseCodes)
+  let allsumaries
+  for (let i = 0; i < accounts.length; i++) {
+    let account = accounts[i]
+    let user = account.user
+    let password = account.password
 
-  console.log(" bot doing handleSumaryCourses", sumaries)
+    await bot.login(username, password)
+    let summary = await bot.getSummary(courseCodes)
+
+    sumaries.concat( summary)
+    await bot.logout()
+
+  }
+
+
+
+  console.log(" bot doing handleSumaryCourses", sumaries.length)
 
   await driver.quit()
   return sumaries
 }
 
 // 学习多门课程
-async function handleLearnCourses(couseCodes, username, password, options = {}) {
+async function handleLearnCourses(courseCodes, username, password, options = {}) {
   if( !username || !password){
     throw  new Error( "用户名和密码是必须的")
   }
@@ -100,22 +139,22 @@ async function handleLearnCourses(couseCodes, username, password, options = {}) 
 
   await bot.login(username, password)
   await bot.prepareForLearn()
-  for( let i=0; i<couseCodes.length; i++){
-    let couseCode = couseCodes[i]
-    let log = await bot.getLog(username, couseCode)
+  for( let i=0; i<courseCodes.length; i++){
+    let courseCode = courseCodes[i]
+    let log = await bot.getLog(username, courseCode)
     if( log ){
-      console.error("开始学习课程："+ couseCode )
+      console.error("开始学习课程："+ courseCode )
       await bot.learnCourse(options)
     }else{
       //throw  new Error( "用户名和密码是必须的")
-      console.error("没有找到课程数据文件："+ couseCode )
+      console.error("没有找到课程数据文件："+ courseCode )
     }
   }
 
   await driver.quit()
 }
 
-async function handleLearnCourse(couseCode, username, password) {
+async function handleLearnCourse(courseCode, username, password) {
   if( !username || !password){
     throw  new Error( "用户名和密码是必须的")
   }
@@ -123,30 +162,30 @@ async function handleLearnCourse(couseCode, username, password) {
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver, {username})
   console.log(" 机器人初始化成功，开始学习课程")
-  let log = await bot.getLog(username, couseCode)
+  let log = await bot.getLog(username, courseCode)
   if( log ){
     await bot.login(username, password)
-    await bot.prepareForLearn(couseCode)
+    await bot.prepareForLearn(courseCode)
     await bot.learnCourse()
   }else{
-    console.error("没有找到课程数据文件："+ couseCode )
+    console.error("没有找到课程数据文件："+ courseCode )
   }
   await driver.quit()
 }
 
-async function handleLearnByCodeModule(couseCode, moduleCode,username, password) {
+async function handleLearnByCodeModule(courseCode, moduleCode,username, password) {
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver, {username})
   console.debug("开始学习小节")
   // let username = '1934001474084'; // 1934001474084
   // let password = '19930902'       // 19930902
-  let log = await bot.getLog(username, couseCode)
+  let log = await bot.getLog(username, courseCode)
   if( log ){
     await bot.login(username, password)
-    await bot.prepareForLearn(couseCode)
+    await bot.prepareForLearn(courseCode)
     await bot.learnModule(moduleCode)
   }else{
-    console.error("没有找到课程数据文件："+ couseCode )
+    console.error("没有找到课程数据文件："+ courseCode )
   }
   await driver.quit()
 }
@@ -156,10 +195,10 @@ async function saveUserJson(username, userInfo) {
   fs.writeFileSync(filename, JSON.stringify(userInfo));
 }
 
-function isCouseJsonExists(username, couseTitle) {
+function isCouseJsonExists(username, courseTitle) {
   let dir = './db/students'
 
-  let filename = dir + '/' + username + '_' + couseTitle + '.json'
+  let filename = dir + '/' + username + '_' + courseTitle + '.json'
   //console.log("检查数据文件是否存在：", filename)
 
   return fs.existsSync( filename )
@@ -167,6 +206,7 @@ function isCouseJsonExists(username, couseTitle) {
 
 
 module.exports = {
+  handleAccountsCheckin,
   handleCreateDb,
   handleCreateLog,
   handleLearnCourse,

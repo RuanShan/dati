@@ -42,11 +42,11 @@ async function parseCouseMaoGai(driver) {
   for (let i = 0; i < levelOne.length; i++) {
     let a = levelOne[i]
     let text = await a.getText()
-    let id = await a.getAttribute('id')
-    console.log(`levelOne.text ${i} ${id} ${text}`)
+    let sectionId = await a.getAttribute('id')
+    console.log(`levelOne.text ${i} ${sectionId} ${text}`)
     let levelTwo = await a.findElements(By.css(sectionl2Css))
     if (levelTwo.length == 0) {
-      console.log(`levelOne.text ${i} ${id} ${text} 没有内容。`)
+      console.log(`levelOne.text ${i} ${sectionId} ${text} 没有内容。`)
       continue
     }
     let b = levelTwo[0]
@@ -71,7 +71,7 @@ async function parseCouseMaoGai(driver) {
       if (imgs.length >= 1){
         // 每节课前面的图标
         let src = await imgs[0].getAttribute('src')
-        if( src.includes('core_h.png') && text.includes('视频') ){ //视频1：新时代党的建设总要求网页地址
+        if( src.includes('core_h.png')){ //视频1：新时代党的建设总要求网页地址
           type = 'video'
         }else if( src.includes('quiz_h.png')){
           type = 'quiz'
@@ -87,11 +87,13 @@ async function parseCouseMaoGai(driver) {
         href = await link.getAttribute('href')
       }
       let course = {
+        classId: classId, // 用于script调用，如完成视频
+        sectionId: sectionId.substring(8), // section-xxx
         type: type,
         title: text,
         isFinish: alt.substring(0, 3),
         url: href,
-        id: id.substring(7)
+        id: id.substring(7) // module-xxx
       }
       status.push(course)
       if (alt.startsWith("未完成")) {

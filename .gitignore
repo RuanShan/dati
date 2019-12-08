@@ -16,3 +16,5 @@ eng.traineddata
 app.log
 db/students
 dist.zip
+account.csv
+account.json
