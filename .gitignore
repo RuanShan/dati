@@ -15,6 +15,7 @@ dati.exe
 eng.traineddata
 app.log
 db/students
+db/subjects
 dist.zip
-account.csv
+account*
 account.json

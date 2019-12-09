@@ -49,6 +49,10 @@ async function parseCouseMaoGai(driver) {
       console.log(`levelOne.text ${i} ${sectionId} ${text} 没有内容。`)
       continue
     }
+    if( /课程文件|资源更新区|电大资源区/.test( text )){
+      continue
+    }
+    // 课程文件, 资源更新区, 电大资源区
     let b = levelTwo[0]
 
     let isDisplayed = await b.isDisplayed()

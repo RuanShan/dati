@@ -44,6 +44,9 @@ async function parseCouseMaKeSi(driver) {
       console.log(`levelOne.text ${i} ${id} ${text} 没有内容。`)
       continue
     }
+    if( /课程文件|资源更新区|电大资源区/.test( text )){
+      continue
+    }
     let b = levelTwo[0]
 
     let isDisplayed = await b.isDisplayed()

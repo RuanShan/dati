@@ -83,18 +83,25 @@ class Bot {
     } // 课程学习状态
   }
 
-  async getLog(username, couseTitle) {
+  // 读取用户课程数据文件
+  // options - filename: 数据文件路径
+  async getLog( couseTitle, options={} ) {
     let that = this
     this.couseTitle = couseTitle
     this.recursiveCount = 0
-    let filename = await this.getCouseJsonPath(couseTitle)
+    let { filename } = options
+
+    if(!filename){
+      // 需在constructor中 配置username
+      filename = await this.getCouseJsonPath(couseTitle)
+    }
     if( fs.existsSync( filename)){
       let data = fs.readFileSync(filename, "utf-8")
       if (data != null) {
 
         let res = JSON.parse(data);
         console.info(`读取课程数据 ${couseTitle}`);
-        that.courseInfo= res;
+        that.courseInfo.status = res;
       }
     } else {
       logger.error(`无法读取课程数据文件 ${filename}`);
@@ -103,6 +110,8 @@ class Bot {
 
     return filename
   }
+
+
 
   async readScore(couseTitle){
     let filename = await this.getCouseJsonPath(couseTitle)
@@ -171,6 +180,9 @@ class Bot {
       await driver.wait(until.titleContains('学生空间'), 10000);
       await driver.get('http://student.ouchn.cn/#home')
       logger.info('登录成功!!');
+      // 用于打开其它窗口后，再回来打开其它课程
+      this.mainHandle = await driver.getWindowHandle()
+
       success = true
     }catch( e){
       logger.info('登录失败!!');
@@ -275,20 +287,22 @@ class Bot {
 
 
   async learnModule(moduleCode) {
+
     logger.info(`课程${ this.couseTitle} 小节 ${moduleCode} 开始学习。`)
     let driver = this.driver
     let moduleStatus = this.courseInfo.status
-
+    let success = false
     for (let i = 0; i < moduleStatus.length; i++) {
       let lesson = moduleStatus[i];
       let title = lesson.title
       let isFinish = lesson.isFinish;
       let type = lesson.type
       let url = lesson.url
-      if (url.length == 0) {
-        console.debug(`小节 ${title} 没有 url`);
-        continue
-      }
+      // 看视频无需url
+      // if (url.length == 0) {
+      //   console.debug(`小节 ${title} 没有 url`);
+      //   continue
+      // }
       if (isFinish == '未完成' && lesson.id == moduleCode) {
         // 根据url判断类型
         // 视频|外部文章：mod/url/view
@@ -298,7 +312,7 @@ class Bot {
         console.debug(`类型 ${type} 小节 ${title} `);
         if ( type== 'video'  ) {
           //http://anhui.ouchn.cn/course/view.php?id=4257&sectionid=91623&mid=561704
-          await this.watchVideoByApi(lesson)
+          success = await this.watchVideoByApi(lesson)
         } else if (url.includes('/mod/page/view')) {
           await this.readText(lesson)
         } else if (url.includes('/mod/quiz/view')) {
@@ -311,7 +325,9 @@ class Bot {
 
 
     }
+    console.debug(` 小节 ${moduleCode} 学习结束 ${success} `);
 
+    return success
   }
 
 
@@ -399,6 +415,8 @@ class Bot {
     // $.getJSON('http://shenyang.ouchn.cn/theme/blueonionre/modulesCompletion.php?cmid=437329&id=3935&sectionid=27', function(res){ console.log(res)})
     console.log('==================watchVideo=================');
     let success = true
+    let course = CouseUrlMap[this.couseTitle]
+
     let driver = this.driver
     let isFinish = lesson.isFinish;
     let id = lesson.id
@@ -408,14 +426,14 @@ class Bot {
       console.log('course-----:', lesson);
       let url = lesson.url
       let title = lesson.title
-      await driver.get(url);
+      // http://shenyang.ouchn.cn/mod/url/view.php?id=526346
+      await driver.get(`http://${course.host}/mod/url/view.php?id=${id}`);
       // 可能被重定向到 xxx.pdf
-
       try{
         let video = await driver.wait(until.elementLocated(By.tagName('video')), 10000);
-        let script = `$.ajaxsettings.async = false; var res = $.getJSON('/theme/blueonionre/modulesCompletion.php?cmid=${id}&id=${classId}&sectionid=${sectionId}'); return res;`
+        let script = `$.ajaxSetup({ async : false}); var res = null; $.getJSON('/theme/blueonionre/modulesCompletion.php?cmid=${id}&id=${classId}&sectionid=${sectionId}', function(data){ res = data; }); return res;`
         let res = await driver.executeScript(script);
-        console.log('视频播放成功', res);
+        console.log('视频播放成功', typeof(res), res);
       }catch(ex){
         success = false
         console.error('视频播放失败：'+id, ex);
@@ -429,11 +447,15 @@ class Bot {
 
   // 当前在主页，打开所有课程页面
   // 确定当前课程的url 和 code
-  //需要点击一下 ‘进入学习’，获得访问权限 地区.ouchn.cn/course
+  // 需要点击一下 ‘进入学习’，获得访问权限 地区.ouchn.cn/course
   async prepareForLearn(couseTitle) {
     let driver = this.driver
     let mainHandle = await driver.getWindowHandle()
-    let links = await this.getCousesLinks(driver);
+    let links = await this.getCousesLinks(driver, couseTitle);
+    if( links.length == 0){
+      console.error( '无法找到课程'+couseTitle)
+      return false
+    }
     for(let i=0;i<links.length;i++){
       let a = links[i];
       let displayed = await a.isDisplayed()
@@ -464,36 +486,41 @@ class Bot {
       return handles.length == links.length+1
     }, 30000, `错误：${links.length}课程窗口没有打开`)
 
-    console.log('all tab opened2, links', couseTitle);
+    console.log('all tab opened2, links');
     let handles = await driver.getAllWindowHandles()
 
-    let url = ''
+    let success = false
+    let url = null
     for (let i = 0; i < handles.length; i++) {
       let handle = handles[i]
       console.log("mainHandle", i, mainHandle, "handle = ", handle)
       if (mainHandle != handle) {
+        // 等待页面加载成功，title包含 ‘课程’
+
         let locator = driver.switchTo()
         await locator.window(handle)
+        // 需要等待页面加载完成，即标题有中包含 课程
+        await  driver.wait(until.titleContains('课程'));
         let windowTitle = await driver.getTitle() // 课程： 习近平新时代中国特色社会主义思想
         let title = windowTitle.replace('课程： ', '')
-        let url = await driver.getCurrentUrl()
+        url = await driver.getCurrentUrl() //http://shenyang.ouchn.cn/course/view.php?id=4372
         let parsedUrl = URL.parse(url, true)
         let code = parsedUrl.query['id']
-        console.debug("windowTitle, parsed= ", windowTitle, parsedUrl);
-        if( code ){
-          CouseUrlMap[code] = { url, title, code:code  } // [id] = url
-          CouseUrlMap[title] = { url, title, code:code  }   // [习近平新时代中国特色社会主义思想] = url
-        }
+        console.debug(`couseTitle=${couseTitle} windowTitle = ${windowTitle}, parsed= ${parsedUrl} code=${code}`  );
         // 如果找到当前这门课的窗口
         if (couseTitle && windowTitle.indexOf(couseTitle) >= 0) {
           this.couseUrl = url
           this.couseTitle = couseTitle
+          CouseUrlMap[code] = { url, title: couseTitle, code:code  } // [id] = url
+          CouseUrlMap[couseTitle] = { host: parsedUrl.host, url, title: couseTitle, code:code  }   // [习近平新时代中国特色社会主义思想 - 负责] = url
+          success = true
           break;
         }
       }
     }
     console.log("current window url=", url)
     this.recursiveCount = 0
+    return success
   }
 
 
@@ -526,12 +553,13 @@ class Bot {
       let startAt = new Date()
       await this.driver.get(url)
       let windowTitle = await this.driver.getTitle()
-      let couseTitle = windowTitle.replace('课程： ', '')
+
       console.log(" tab.title1 ", title, this.couseTitle, typeof(this.couseTitle))
       if (title == '毛泽东思想和中国特色社会主义理论体系概论') {
         this.courseInfo = await parseCouseMaoGai( this.driver )
       } else if (title == '国家开放大学学习指南') {
-        this.courseInfo = await parseCouseZhiNan( this.driver )
+        //this.courseInfo = await parseCouseZhiNan( this.driver )
+        this.courseInfo = await parseCouseMaoGai( this.driver )
       } else if (title == '习近平新时代中国特色社会主义思想') {
         this.courseInfo = await parseCouseMaoGai( this.driver )
       } else if (title == '思想道德修养与法律基础') {
@@ -549,16 +577,16 @@ class Bot {
         }
       }
 
-      let endAt = new Date()
-      this.courseInfo.score.startAt = startAt
-      this.courseInfo.score.endAt = endAt
+      // let endAt = new Date()
+      // this.courseInfo.score.startAt = startAt
+      // this.courseInfo.score.endAt = endAt
       this.saveCouseJson(this.couseTitle)
     } else {
       console.debug(`课程代码 ${ this.couseTitle} ${courseCodeOrTitle} 找不到课程url`);
     }
   }
 
-  async getCousesLinks(driver) {
+  async getCousesLinks(driver, couseTitle) {
     // 等待 zaixuekecheng dom生成
 
     // 支持的课程
@@ -568,15 +596,15 @@ class Bot {
     await driver.wait(until.elementLocated(By.id('zaixuekecheng')));
     let div = await driver.findElement(By.id('zaixuekecheng'));
     let couses = await driver.findElements(By.css('#zaixuekecheng .media'));
-    console.debug("getCousesLinks couses=",couses.length);
+    console.debug("getCousesLinks couses=", couseTitle, couses.length);
     for(let i=0;i <couses.length; i++){
       let couse = couses[i]
       let titleElement = await couse.findElement(By.css('.media-title'));
       let title = await titleElement.getText()
       let buttonElement = await couse.findElement(By.css('.course-entry button'));
       let text = await buttonElement.getText()
-      console.debug("getCousesLinks couse=",title, text);
-      if( couseTitles.includes( title )){
+      console.debug("getCousesLinks couse=",title, couseTitle.includes( title ));
+      if( couseTitle.includes( title )){
         links.push(buttonElement)
       }
     }
@@ -587,7 +615,8 @@ class Bot {
   async saveCouseJson(classId) {
     let filename = await this.getCouseJsonPath(classId)
     //console.log('this.courseInfo----:',this.courseInfo);
-    fs.writeFile(filename, JSON.stringify(this.courseInfo), (err) => {
+    // 保存 课程信息时只保存status 即每一课的信息，以便和快速开视频使用相同的结构的文件
+    fs.writeFile(filename, JSON.stringify(this.courseInfo.status), (err) => {
       if (err) throw err;
       console.log(`文件已被保存:${filename}`);
     });
@@ -682,7 +711,41 @@ class Bot {
 
   }
 
+  // 关闭除main之外的其它tab
+  async closeOtherTabs(){
+    let driver = this.driver
+    let mainHandle = this.mainHandle
+    let handles = await driver.getAllWindowHandles()
 
+    let locator = await driver.switchTo()
+
+    for (let i = 0; i < handles.length; i++) {
+      let handle = handles[i]
+      console.log("mainHandle0", i, mainHandle, "handle = ", handle)
+      if (mainHandle != handle) {
+        try{
+        await locator.window(handle)
+        // 等待0.5秒，否则报错  target window already closed
+        // await  driver.wait( function(){
+        //   return new Promise((resolve, reject) => {
+        //     setTimeout(resolve, 500);
+        //   })
+        // });
+
+          await driver.close()
+        }catch(e){
+          console.error("driver.close",e);
+        }
+      }
+    }
+    await locator.window(mainHandle)
+    await driver.wait(until.titleContains('学生空间'), 10000);
+    console.debug("closeOtherTabs1");
+    // await driver.wait(async () => {
+    //   let handles = await driver.getAllWindowHandles()
+    //   return handles.length == 1
+    // }, 30000, `错误：${handles.length}课程窗口没有关闭`)
+  }
 
 }
 

@@ -37,11 +37,14 @@ async function parseCouseZhiNan(driver) {
   for (let i = 0; i < levelOne.length; i++) {
     let a = levelOne[i]
     let text = await a.getText()
-    let id = await a.getAttribute('id')
-    console.log(`levelOne.text ${i} ${id} ${text}`)
+    let sectionId = await a.getAttribute('id')
+    console.log(`levelOne.text ${i} ${sectionId} ${text}`)
     let levelTwo = await a.findElements(By.css(sectionl2Css))
     if (levelTwo.length == 0) {
-      console.log(`levelOne.text ${i} ${id} ${text} 没有内容。`)
+      console.log(`levelOne.text ${i} ${sectionId} ${text} 没有内容。`)
+      continue
+    }
+    if( /课程文件|资源更新区|电大资源区/.test( text )){
       continue
     }
     let b = levelTwo[0]
@@ -77,6 +80,8 @@ async function parseCouseZhiNan(driver) {
         href = await link.getAttribute('href')
       }
       let course = {
+        classId: classId, // 用于script调用，如完成视频
+        sectionId: sectionId.substring(8), // section-xxx
         title: text,
         type: type,
         isFinish: alt.substring(0, 3),

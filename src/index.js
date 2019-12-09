@@ -56,16 +56,18 @@ async function handleCreateDb(courseCodes, username, password ) {
     // 1934001474084
     // 19930902
   await bot.login(username, password)
-  await bot.prepareForLearn()
   let userInfo = { username, courses:[] }
   for( let i=0; i<courseCodes.length; i++){
     let courseCode = courseCodes[i]
+    await bot.prepareForLearn(courseCode)
     // 如果这门课的数据文件存在
     let exists =  isCouseJsonExists( username, courseCode)
     if( !exists ){
       await bot.profileCouse(courseCode)
       userInfo.courses.push( bot.courseInfo.score )
     }
+    await bot.closeOtherTabs( )
+
   }
   await saveUserJson( username, userInfo )
   await driver.quit()
@@ -108,7 +110,7 @@ async function handleGetCourseSumaries(accounts, courseCodes ){
   let allsumaries
   for (let i = 0; i < accounts.length; i++) {
     let account = accounts[i]
-    let user = account.user
+    let user = account.username
     let password = account.password
 
     await bot.login(username, password)
@@ -141,7 +143,7 @@ async function handleLearnCourses(courseCodes, username, password, options = {})
   await bot.prepareForLearn()
   for( let i=0; i<courseCodes.length; i++){
     let courseCode = courseCodes[i]
-    let log = await bot.getLog(username, courseCode)
+    let log = await bot.getLog( courseCode)
     if( log ){
       console.error("开始学习课程："+ courseCode )
       await bot.learnCourse(options)
@@ -162,7 +164,7 @@ async function handleLearnCourse(courseCode, username, password) {
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver, {username})
   console.log(" 机器人初始化成功，开始学习课程")
-  let log = await bot.getLog(username, courseCode)
+  let log = await bot.getLog( courseCode)
   if( log ){
     await bot.login(username, password)
     await bot.prepareForLearn(courseCode)
@@ -173,21 +175,66 @@ async function handleLearnCourse(courseCode, username, password) {
   await driver.quit()
 }
 
-async function handleLearnByCodeModule(courseCode, moduleCode,username, password) {
+// 学习某一个人的一节课
+async function handleLearnModuleByCode(courseCode, moduleCode,username, password) {
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver, {username})
   console.debug("开始学习小节")
   // let username = '1934001474084'; // 1934001474084
   // let password = '19930902'       // 19930902
-  let log = await bot.getLog(username, courseCode)
+  let log = await bot.getLog( courseCode)
   if( log ){
     await bot.login(username, password)
     await bot.prepareForLearn(courseCode)
-    await bot.learnModule(moduleCode)
+    let success = await bot.learnModule(moduleCode)
+
+
   }else{
     console.error("没有找到课程数据文件："+ courseCode )
   }
   await driver.quit()
+}
+
+// 学习账户中所有人的N节课
+async function handleLearnModuleOfAccounts(accounts, courseCode, moduleCodes ) {
+  let driver = await new Builder().forBrowser('chrome').build();
+
+  let bot = new Bot(driver )
+  console.debug("开始学习小节, 人数=", accounts.length)
+  // let username = '1934001474084'; // 1934001474084
+  // let password = '19930902'       // 19930902
+
+  // '04931-习近平新时代中国特色社会主义思想'
+
+  let filename = `./db/subjects/${courseCode.replace(/[\d\-]*/,'')}.json`
+  let log = await bot.getLog( courseCode, { filename })
+  let results = []
+  if( log ){
+    // 将module放在外面，虽然效率低，但是看视频请求api时，不会导致时间冲突
+    for (let j = 0; j < moduleCodes.length; j++) {
+      let moduleCode = moduleCodes[j]
+      for (let i = 0; i < accounts.length; i++) {
+        let account = accounts[i]
+        let username = account.username
+        let password = account.password
+        console.debug("bot.learnModule ", username);
+        await bot.login(username, password)
+        await bot.prepareForLearn(courseCode)
+        let success = await bot.learnModule(moduleCode)
+        console.debug("bot.learnModule1");
+        await bot.closeOtherTabs( )
+
+        results.push( { username, moduleCode, success})
+        await bot.logout()
+      }
+    }
+
+  }else{
+    console.error("没有找到课程数据文件："+ courseCode )
+  }
+  await driver.quit()
+  let saveFilename =  `./db/students/module.json`
+  fs.writeFileSync(saveFilename, JSON.stringify(results));
 }
 
 async function saveUserJson(username, userInfo) {
@@ -212,6 +259,7 @@ module.exports = {
   handleLearnCourse,
   handleLearnCourses,
   handleGetCourseSumaries,
-  handleLearnByCodeModule,
+  handleLearnModuleByCode,
+  handleLearnModuleOfAccounts,
   handleReadScore
 }
