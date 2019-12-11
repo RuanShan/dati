@@ -58,7 +58,7 @@ async function parseCouseSiXiu(driver) {
     for (let j = 0; j < levelTwo.length; j++) {
       let b = levelTwo[j]
       let text = await b.getText()
-      let id = await b.getAttribute('id')
+      let sectionId = await b.getAttribute('id')
       let imgs = await b.findElements(By.tagName('img'))
       let alt = "未完成"
       let type = 'unkonwn' // text, video, quiz
@@ -80,6 +80,8 @@ async function parseCouseSiXiu(driver) {
         href = await link.getAttribute('href')
       }
       let course = {
+        classId: classId, // 用于script调用，如完成视频
+        sectionId: sectionId.substring(8), // section-xxx
         title: text,
         type: type,
         isFinish: alt.substring(0, 3),

@@ -490,7 +490,7 @@ class Bot {
     await driver.wait(async () => {
       let handles = await driver.getAllWindowHandles()
       return handles.length == links.length+1
-    }, 40000, `错误：${links.length}课程窗口没有打开`)
+    }, 50000, `错误：${links.length}课程窗口没有打开`)
 
     console.log('all tab opened2, links');
     let handles = await driver.getAllWindowHandles()

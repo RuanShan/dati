@@ -368,13 +368,18 @@ function isAvaible() {
 
 
 function getCourseNameByCode(code) {
-  if (code == '04384') return '马克思主义基本原理概论'
-  if (code == '04390') return '中国近现代史纲要'
-  if (code == '3945') return '习近平新时代中国特色社会主义思想'
-  if (code == '04678') return '毛泽东思想和中国特色社会主义理论体系概论'
-  if (code == '04680') return '思想道德修养与法律基础'
-  if (code == '4065') return '习近平新时代中国特色社会主义思想'
-  if (code == '4498') return '中国特色社会主义理论体系概论'
+  // liaoning
+  if (code == '4372') return '4372_毛泽东思想和中国特色社会主义理论体系概论'
+  if (code == '3935') return '3935_马克思主义基本原理概论'
+  if (code == '3945') return '3945_习近平新时代中国特色社会主义思想'
+  if (code == '4065') return '4065_习近平新时代中国特色社会主义思想'
+  if (code == '3937') return '3937_思想道德修养与法律基础'
+  if (code == '4374') return '4374_思想道德修养与法律基础'
+  if (code == '3944') return '3944_中国近现代史纲要'
+  if (code == '4373') return '4373_中国近现代史纲要'
+  if (code == '4387') return '4387_中国特色社会主义理论体系概论'
+  // heilongjiang
+  if (code == '4498') return '4498_中国特色社会主义理论体系概论'
 
   return null
 
