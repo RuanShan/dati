@@ -413,7 +413,7 @@ class Bot {
   // 通过api去看视频
   async watchVideoByApi(lesson){
     // $.getJSON('http://shenyang.ouchn.cn/theme/blueonionre/modulesCompletion.php?cmid=437329&id=3935&sectionid=27', function(res){ console.log(res)})
-    console.log('==================watchVideo=================');
+    console.log('==================watchVideo=================', CouseUrlMap);
     let success = true
     let course = CouseUrlMap[this.couseTitle]
 
@@ -423,7 +423,7 @@ class Bot {
     let classId = lesson.classId
     let sectionId = lesson.sectionId
     if (isFinish == '未完成') {
-      console.log('course-----:', lesson);
+      console.log('lesson:', lesson);
       let url = lesson.url
       let title = lesson.title
       // http://shenyang.ouchn.cn/mod/url/view.php?id=526346
@@ -445,10 +445,16 @@ class Bot {
 
   }
 
-  // 当前在主页，打开所有课程页面
-  // 确定当前课程的url 和 code
-  // 需要点击一下 ‘进入学习’，获得访问权限 地区.ouchn.cn/course
+  /**
+   * 确定当前课程的url 和 code
+   * 需要点击一下 ‘进入学习’，获得访问权限 地区.ouchn.cn/course
+   * @param {string} couseTitle -  如：“4498_中国特色社会主义理论体系概论”
+   * @return {object} course 当前课程信息 或 null/undefined
+   */
+
   async prepareForLearn(couseTitle) {
+    // 处理 “4498_中国特色社会主义理论体系概论” 情况
+    couseTitle = couseTitle.replace(/[\d_-\s]+/g,'')
     let driver = this.driver
     let mainHandle = await driver.getWindowHandle()
     let links = await this.getCousesLinks(driver, couseTitle);
@@ -484,7 +490,7 @@ class Bot {
     await driver.wait(async () => {
       let handles = await driver.getAllWindowHandles()
       return handles.length == links.length+1
-    }, 30000, `错误：${links.length}课程窗口没有打开`)
+    }, 40000, `错误：${links.length}课程窗口没有打开`)
 
     console.log('all tab opened2, links');
     let handles = await driver.getAllWindowHandles()
@@ -511,7 +517,7 @@ class Bot {
         if (couseTitle && windowTitle.indexOf(couseTitle) >= 0) {
           this.couseUrl = url
           this.couseTitle = couseTitle
-          CouseUrlMap[code] = { url, title: couseTitle, code:code  } // [id] = url
+          CouseUrlMap[code] = { host: parsedUrl.host, url, title: couseTitle, code:code  } // [id] = url
           CouseUrlMap[couseTitle] = { host: parsedUrl.host, url, title: couseTitle, code:code  }   // [习近平新时代中国特色社会主义思想 - 负责] = url
           success = true
           break;
@@ -520,7 +526,7 @@ class Bot {
     }
     console.log("current window url=", url)
     this.recursiveCount = 0
-    return success
+    return CouseUrlMap[couseTitle]
   }
 
 
@@ -568,7 +574,10 @@ class Bot {
         this.courseInfo = await parseCouseJinDaiShi( this.driver )
       }else if (title == '马克思主义基本原理概论') {
         this.courseInfo = await parseCouseMaKeSi( this.driver )
+      }else if (title == '中国特色社会主义理论体系概论') {
+        this.courseInfo = await parseCouseMaoGai( this.driver )
       }
+
       let position = 0;
       for(let i=0;i<this.courseInfo.status.length;i++){
         if(this.courseInfo.status[i].type == 'quiz'){
@@ -746,6 +755,7 @@ class Bot {
     //   return handles.length == 1
     // }, 30000, `错误：${handles.length}课程窗口没有关闭`)
   }
+
 
 }
 

@@ -5,6 +5,7 @@ const csv = require('csv');
 const csvParseSync = require('csv-parse/lib/sync')
 const csvGenerateSync = require('csv-generate/lib/sync')
 
+const enableVideoApi = true
 const {
   handleCreateDb,
   handleAccountsCheckin,
@@ -14,7 +15,8 @@ const {
   handleLearnByCodeModule,
   handleGetCourseSumaries,
   handleLearnModuleOfAccounts,
-  handleReadScore
+  handleReadScore,
+  getAccountsCourseCode
 } = require('./src/index')
 
 // example: node app.js -- createlog 4255 #毛泽东思想和中国特色社会主义理论体
@@ -36,33 +38,49 @@ program.command('createlog <course>')
   })
 
 // 生成学习用 module id 文件
-  program.command('createModuleFile <course>')
-    .description('create module file')
-    .action(function(course) {
-
-      let type = program.type
-      let filename = './db/subjects/'+course+'.json'
-      let data = fs.readFileSync(filename, "utf-8")
-      let res = JSON.parse(data);
-      let moduleids = []
-      res.forEach((r)=>{
-        if ( type == r.type){
-          moduleids.push( r.id)
-        }
-      })
-
-      // 保存文件
-      let saveFilename = `./db/subjects/${course}_${type}_module.json`
-      fs.writeFileSync(saveFilename, JSON.stringify(moduleids))
-      //fs.writeFileSync(filename, csvGenerateSync(sumaries ))
-
+program.command('createModuleFile <course>')
+  .description('create module file')
+  .action(function(course) {
+    // 4065_习近平新时代中国特色社会主义思想
+    let type = program.type
+    let filename = './db/subjects/' + course + '.json'
+    let data = fs.readFileSync(filename, "utf-8")
+    let res = JSON.parse(data);
+    let moduleids = []
+    res.forEach((r) => {
+      if (type == r.type) {
+        moduleids.push(r.id)
+      }
     })
+
+    // 保存文件
+    let saveFilename = `./db/subjects/${course}_${type}_module.json`
+    fs.writeFileSync(saveFilename, JSON.stringify(moduleids))
+    //fs.writeFileSync(filename, csvGenerateSync(sumaries ))
+
+  })
 
 program.command('lcourse <course>')
   .description('learn all module')
-  .action(function(course) {
-    console.log("handleLearnCourse ", course, program.username, program.password)
-    handleLearnCourse(course, program.username, program.password)
+  .action(async function(course) {
+    if (!isAvaible()) {
+      console.log("软件出现问题，请联系开发人员13322280797！")
+      return
+    }
+    let courseTitle = course
+    if (Number(course)) {
+      courseTitle = getCourseNameByCode(course)
+    }
+
+    let accounts = await getAccountsJsonByKey(program.account)
+    let username = null,
+      password = null
+    if (accounts.length > 0) {
+      username = accounts[0].username
+      password = accounts[0].password
+    }
+    console.log("handleLearnCourse ", course, username, password)
+    handleLearnCourse(courseTitle, username, password)
   })
 
 program.command('lmodule <course> <module>')
@@ -70,13 +88,16 @@ program.command('lmodule <course> <module>')
   .action(async function(course, moduleCode) {
     console.log("handleLearnByCodeModule ", moduleCode)
     let accounts = []
-    if( program.account){
+    if (program.account) {
       accounts = await getAccountsCsvByKey(accountfile)
     }
-    if( program.username ){
-      accounts.push( { username: program.username, password: program.password  })
+    if (program.username) {
+      accounts.push({
+        username: program.username,
+        password: program.password
+      })
     }
-    handleLearnByCodeModule( course, moduleCode, program.username, program.password)
+    handleLearnByCodeModule(course, moduleCode, program.username, program.password)
   })
 
 program.command('readscore <course>')
@@ -107,17 +128,24 @@ program.command('checkin [accountfile]')
   .description('checkin all accounts, support json, csv')
   .action(async function(accountfile) {
 
-    let accounts = []
-    accountfile = accountfile || 'account.json'
-    if( /csv$/.test(accountfile )){
-      accounts = await getAccountsCsvByKey(accountfile)
+    let accounts = await getAccounts(accountfile)
 
-    }else if ( /json$/.test(accountfile )){
-      accounts = await getAccountsJsonByKey(accountfile)
-    }
-    console.log("检查账户登录...", accountfile )
+    console.log("检查账户登录...", accountfile)
 
     await handleAccountsCheckin(accounts)
+
+  })
+
+  //  根据账号，课程名称，取得科目代码
+  program.command('getcode [accountfile]')
+    .description('checkin all accounts, support json, csv')
+    .action(async function(accountfile) {
+      // [{username, password, subject}]
+      let accounts = await getAccounts(accountfile)
+
+      console.log("检查账户登录...", accountfile)
+
+      await getAccountsCourseCode(accounts)
 
   })
 // 根据网络数据，建立学习进度数据文件
@@ -132,12 +160,12 @@ program.command('summary [accountfile]')
     let accounts = await getAccounts(accountfile)
     console.log("get all course summary", accountfile, accounts.length)
 
-    let sumaries = await handleGetCourseSumaries(accounts, cids )
+    let sumaries = await handleGetCourseSumaries(accounts, cids)
 
     // 保存文件
     let filename = './db/summary.csv'
     //fs.writeFileSync(filename, JSON.stringify(sumaries))
-    fs.writeFileSync(filename, csvGenerateSync(sumaries ))
+    fs.writeFileSync(filename, csvGenerateSync(sumaries))
 
   })
 
@@ -190,28 +218,46 @@ program.command('all [accountfile]')
     // 按顺序学习每门课程
   })
 
-  // 学习给定一些账户的N节课
-  program.command('lmodules <course> [moduleCode]')
-    .description('learn by code module')
-    .action(async function(course, moduleCode) {
-      console.log("handleLearnByCodeModule ",course, moduleCode)
-      let accounts = []
-      if( program.account){
-        accounts = await getAccounts( program.account)
-      }
-      if( program.username ){
-        accounts.push( { username: program.username, password: program.password  })
-      }
-      let moduleCodes = null
-      if( moduleCode ){
-        let moduleCodes = [moduleCode]
-      }else{
-        moduleCodes = await getModuleIds(course)
-      }
-      // 如果moduleCode 没有传，取得课程的所有 module
+// 学习给定一些账户的N节课
+// course 如果是中文的话，bat文件会产生乱码
+program.command('lmodules <course> [moduleCode]')
+  .description('learn by code module')
+  .action(async function(course, moduleCode) {
+    if (!enableVideoApi) {
+      console.log("功能开发中...")
+      return
+    }
+    if (!isAvaible()) {
+      console.log("软件出现问题，请联系开发人员13322280797！")
+      return
+    }
+    console.log("handleLearnByCodeModule ", course, Number(course), moduleCode)
+    let accounts = []
+    if (program.account) {
+      accounts = await getAccounts(program.account)
+    }
+    if (program.username) {
+      accounts.push({
+        username: program.username,
+        password: program.password
+      })
+    }
 
-      await handleLearnModuleOfAccounts( accounts, course, moduleCodes )
-    })
+    let courseTitle = course
+    if (Number(course)) {
+      courseTitle = getCourseNameByCode(course)
+    }
+
+    // 如果moduleCode 没有传，取得课程的所有 module
+    let moduleCodes = null
+    if (moduleCode) {
+      let moduleCodes = [moduleCode]
+    } else {
+      moduleCodes = await getModuleIds(courseTitle)
+    }
+
+    await handleLearnModuleOfAccounts(accounts, courseTitle, moduleCodes)
+  })
 
 program.parse(process.argv)
 
@@ -220,34 +266,34 @@ if (program.password) console.log(`- ${program.password}`);
 
 
 
-async function getAccounts(accountfile){
+async function getAccounts(accountfile) {
   let accounts = []
-  if( /csv$/.test(accountfile )){
+  if (/csv$/.test(accountfile)) {
     accounts = await getAccountsCsvByKey(accountfile)
 
-  }else if ( /json$/.test(accountfile )){
+  } else if (/json$/.test(accountfile)) {
     accounts = await getAccountsJsonByKey(accountfile)
   }
   return accounts
 }
 
-async function getModuleIds(course){
+async function getModuleIds(course) {
   let moduleids = []
 
-  let filename =  `./db/subjects/${course}_${program.type}_module.json`
+  let filename = `./db/subjects/${course}_${program.type}_module.json`
 
-    try {
-      let data = fs.readFileSync(filename, "utf-8")
-      if (data != null) {
+  try {
+    let data = fs.readFileSync(filename, "utf-8")
+    if (data != null) {
 
-        moduleids = JSON.parse(data);
+      moduleids = JSON.parse(data);
 
-      } else {
-        console.error(`无法读取数据文件 ${filename}`);
-      }
-    } catch (ex) {
-      console.error(`无法读取数据文件 ${filename}`, ex);
+    } else {
+      console.error(`无法读取数据文件 ${filename}`);
     }
+  } catch (ex) {
+    console.error(`无法读取数据文件 ${filename}`, ex);
+  }
 
   return moduleids
 }
@@ -259,19 +305,27 @@ async function getAccountsJsonByKey(filename) {
   // if( isNetwork ){
   //
   // }
-  filename = filename || 'account.json'
-  if (filename) {
-    try {
-      let data = fs.readFileSync(filename, "utf-8")
-      if (data != null) {
 
-        let res = JSON.parse(data);
-        accounts = res.accounts || [];
-      } else {
-        console.error(`无法读取账户文件 ${filename}`);
+  if (program.username) {
+    accounts.push({
+      username: program.username,
+      password: program.password
+    })
+  } else {
+    filename = filename || 'account.json'
+    if (filename) {
+      try {
+        let data = fs.readFileSync(filename, "utf-8")
+        if (data != null) {
+
+          let res = JSON.parse(data);
+          accounts = res.accounts || [];
+        } else {
+          console.error(`无法读取账户文件 ${filename}`);
+        }
+      } catch (ex) {
+        console.error(`无法读取账户文件 ${filename}`, ex);
       }
-    } catch (ex) {
-      console.error(`无法读取账户文件 ${filename}`, ex);
     }
   }
   return accounts
@@ -310,4 +364,18 @@ function isAvaible() {
   } else {
     return false
   }
+}
+
+
+function getCourseNameByCode(code) {
+  if (code == '04384') return '马克思主义基本原理概论'
+  if (code == '04390') return '中国近现代史纲要'
+  if (code == '3945') return '习近平新时代中国特色社会主义思想'
+  if (code == '04678') return '毛泽东思想和中国特色社会主义理论体系概论'
+  if (code == '04680') return '思想道德修养与法律基础'
+  if (code == '4065') return '习近平新时代中国特色社会主义思想'
+  if (code == '4498') return '中国特色社会主义理论体系概论'
+
+  return null
+
 }

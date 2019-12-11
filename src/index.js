@@ -6,6 +6,7 @@ const {
   playVideo
 } = require('./util.js');
 
+
 const {
   Bot,
   handleVerifyCode
@@ -42,6 +43,44 @@ async function handleAccountsCheckin(  accounts=[] ) {
    await driver.quit()
    let filename =  './db/students/checkin.json'
    fs.writeFileSync(filename, JSON.stringify(checkins));
+}
+
+// 取得学科的代码，确认学科代码
+// accounts [{username, password, subject}]
+async function getAccountsCourseCode(  accounts=[] ) {
+
+  let driver = await new Builder().forBrowser('chrome').build();
+  let bot = new Bot(driver)
+  console.log(" bot doing accounts checkin", accounts.length)
+    // 1934001474084
+    // 19930902
+  let checkins = []
+  for(let i=0; i<accounts.length; i++){
+    let account = accounts[i]
+    let { username, password, subject } = account
+    if( username && username.length>0 && password && password.length>0){
+      let success = await bot.login(username, password)
+      let courseCode = { username, password, checkin: success, subject }
+      if( success){
+        let course = await bot.prepareForLearn(subject)
+        if( course){
+          courseCode.code =  course.code
+        }else{
+            console.error(`不能找到学生${username}的课程[${subject}]`)
+        }
+        await bot.closeOtherTabs( )
+
+      }
+      checkins.push( courseCode)
+      await bot.logout()
+      console.log("登录账户: ", i, account.username, success)
+    }
+    let filename =  './db/students/courses.json'
+    fs.writeFileSync(filename, JSON.stringify(checkins));
+  }
+
+   await driver.quit()
+
 }
 
 // 为课程代码创建数据库
@@ -204,9 +243,8 @@ async function handleLearnModuleOfAccounts(accounts, courseCode, moduleCodes ) {
   // let username = '1934001474084'; // 1934001474084
   // let password = '19930902'       // 19930902
 
-  // '04931-习近平新时代中国特色社会主义思想'
-
-  let filename = `./db/subjects/${courseCode.replace(/[\d\-]*/,'')}.json`
+  // '04931-习近平新时代中国特色社会主义思想', 这里不再删除数字，课程前可能有代码
+  let filename = `./db/subjects/${courseCode}.json`
   let log = await bot.getLog( courseCode, { filename })
   let results = []
   if( log ){
@@ -261,5 +299,6 @@ module.exports = {
   handleGetCourseSumaries,
   handleLearnModuleByCode,
   handleLearnModuleOfAccounts,
-  handleReadScore
+  handleReadScore,
+  getAccountsCourseCode
 }
