@@ -177,7 +177,7 @@ class Bot {
     let success = false
     //最多等待15秒
      try{
-      await driver.wait(until.titleContains('学生空间'), 10000);
+      await driver.wait(until.titleContains('学生空间'), 20000);
       await driver.get('http://student.ouchn.cn/#home')
       logger.info('登录成功!!');
       // 用于打开其它窗口后，再回来打开其它课程
@@ -456,7 +456,7 @@ class Bot {
     // 处理 “4498_中国特色社会主义理论体系概论” 情况
     couseTitle = couseTitle.replace(/[\d_-\s]+/g,'')
     let driver = this.driver
-    let mainHandle = await driver.getWindowHandle()
+    let mainHandle = this.mainHandle//await driver.getWindowHandle()
     let links = await this.getCousesLinks(driver, couseTitle);
     if( links.length == 0){
       console.error( '无法找到课程'+couseTitle)
@@ -602,7 +602,7 @@ class Bot {
 
     let couseTitles = SupportCouses.map((c)=>c.title)
     let links = []
-    await driver.wait(until.elementLocated(By.id('zaixuekecheng')));
+    await driver.wait(until.elementLocated(By.css('#zaixuekecheng .media')));
     let div = await driver.findElement(By.id('zaixuekecheng'));
     let couses = await driver.findElements(By.css('#zaixuekecheng .media'));
     console.debug("getCousesLinks couses=", couseTitle, couses.length);
@@ -748,7 +748,7 @@ class Bot {
       }
     }
     await locator.window(mainHandle)
-    await driver.wait(until.titleContains('学生空间'), 10000);
+    await driver.wait(until.titleContains('学生空间'), 20000);
     console.debug("closeOtherTabs1");
     // await driver.wait(async () => {
     //   let handles = await driver.getAllWindowHandles()

@@ -224,7 +224,7 @@ async function handleLearnModuleByCode(courseCode, moduleCode,username, password
   let log = await bot.getLog( courseCode)
   if( log ){
     await bot.login(username, password)
-    await bot.prepareForLearn(courseCode)
+    let course = await bot.prepareForLearn(courseCode)
     let success = await bot.learnModule(moduleCode)
 
 
@@ -255,11 +255,15 @@ async function handleLearnModuleOfAccounts(accounts, courseCode, moduleCodes ) {
         let account = accounts[i]
         let username = account.username
         let password = account.password
+        let success = false
         console.debug("bot.learnModule ", username);
         await bot.login(username, password)
-        await bot.prepareForLearn(courseCode)
-        let success = await bot.learnModule(moduleCode)
-        console.debug("bot.learnModule1");
+        let course = await bot.prepareForLearn(courseCode)
+        if( course ){
+          success = await bot.learnModule(moduleCode)
+        }else{
+          console.error("没有找到课程", username, courseCode)
+        }
         await bot.closeOtherTabs( )
 
         results.push( { username, moduleCode, success})
