@@ -84,31 +84,45 @@ async function getAccountsCourseCode(  accounts=[] ) {
 }
 
 // 为课程代码创建数据库
-async function handleCreateDb(courseCodes, username, password ) {
-  if( !username || !password){
-    throw  new Error( "用户名和密码是必须的")
-  }
-
+// accounts [{username, password, subject}]
+async function handleCreateDb(accounts=[] ) {
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver)
   console.log("机器人初始化成功")
-    // 1934001474084
-    // 19930902
-  await bot.login(username, password)
-  let userInfo = { username, courses:[] }
-  for( let i=0; i<courseCodes.length; i++){
-    let courseCode = courseCodes[i]
-    await bot.prepareForLearn(courseCode)
-    // 如果这门课的数据文件存在
-    let exists =  isCouseJsonExists( username, courseCode)
-    if( !exists ){
-      await bot.profileCouse(courseCode)
-      userInfo.courses.push( bot.courseInfo.score )
+  for (let i = 0; i < accounts.length; i++) {
+    let account = accounts[i]
+    let username = account.username
+    let password = account.password
+    let subject = account.subject
+    if( !username || !password || !subject){
+      continue
     }
-    await bot.closeOtherTabs( )
+
+
+      // 1934001474084
+      // 19930902
+    let success = await bot.login(username, password)
+
+    if( success ){
+        //04391-习近平新时代中国特色社会主义思想
+        let courseCode = subject.replace(/[\d_-\s]+/g,'')
+        await bot.prepareForLearn(courseCode)
+        // 如果这门课的数据文件存在
+        let exists =  isCouseJsonExists( username, courseCode)
+        if( !exists ){
+          await bot.profileCouse(courseCode)
+        }
+        await bot.closeOtherTabs( )
+        await bot.logout()
+
+    }else{
+      console.debug('登录失败账号', username, password)
+    }
+
 
   }
-  await saveUserJson( username, userInfo )
+
+  //await saveUserJson( username, userInfo )
   await driver.quit()
 }
 
@@ -169,29 +183,40 @@ async function handleGetCourseSumaries(accounts, courseCodes ){
 }
 
 // 学习多门课程
-async function handleLearnCourses(courseCodes, username, password, options = {}) {
-  if( !username || !password){
-    throw  new Error( "用户名和密码是必须的")
-  }
+async function handleLearnCourses(accounts=[] , options = {}) {
 
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver )
   console.log(" 机器人初始化成功，开始学习课程")
+  for (let i = 0; i < accounts.length; i++) {
+    let account = accounts[i]
+    let username = account.username
+    let password = account.password
+    let subject = account.subject
 
-  await bot.login(username, password)
-  await bot.prepareForLearn()
-  for( let i=0; i<courseCodes.length; i++){
-    let courseCode = courseCodes[i]
-    let log = await bot.getLog( courseCode)
-    if( log ){
-      console.error("开始学习课程："+ courseCode )
-      await bot.learnCourse(options)
-    }else{
-      //throw  new Error( "用户名和密码是必须的")
-      console.error("没有找到课程数据文件："+ courseCode )
+    if( !username || !password || !subject){
+      continue
+    }
+    // 1934001474084 19930902
+    let success = await bot.login(username, password)
+
+    if( success ){
+        //04391-习近平新时代中国特色社会主义思想
+        let courseCode = subject.replace(/[\d_-\s]+/g,'')
+        await bot.prepareForLearn(courseCode)
+
+        let log = await bot.getLog( courseCode)
+        if( log ){
+          console.error("开始学习课程："+ courseCode )
+          await bot.learnCourse(options)
+        }else{
+          //throw  new Error( "用户名和密码是必须的")
+          console.error("没有找到课程数据文件："+ courseCode )
+        }
+        await bot.closeOtherTabs( )
+
     }
   }
-
   await driver.quit()
 }
 

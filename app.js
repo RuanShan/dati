@@ -113,14 +113,11 @@ let cids = ['毛泽东思想和中国特色社会主义理论体系概论', '国
 program.command('initdb [accountfile]')
   .description('create all courses db')
   .action(async function(accountfile) {
-    let accounts = await getAccountsJsonByKey(accountfile)
-    console.log("创建课程db", accountfile, accounts)
-    for (let i = 0; i < accounts.length; i++) {
-      let account = accounts[i]
-      let username = account.username
-      let password = account.password
-      await handleCreateDb(cids, username, password)
-    }
+    let accounts = await getAccounts(accountfile)
+    console.log("创建课程db", accountfile, accounts.length)
+
+    await handleCreateDb(accounts)
+
   })
 
 // 检查所有账户是否可以登录
@@ -182,14 +179,11 @@ program.command('learn [accountfile]')
     }
     // 取得所有账户信息
     // 为每个账户创建课程日志
-    let accounts = await getAccountsJsonByKey(accountfile)
-    console.log("learn all courses", accountfile, accounts)
-    for (let i = 0; i < accounts.length; i++) {
-      let account = accounts[i]
-      let username = account.username
-      let password = account.password
-      await handleLearnCourses(cids, username, password, options)
-    }
+    let accounts = await getAccounts(accountfile)
+    console.log("learn all courses", accountfile, accounts.length)
+
+    await handleLearnCourses(accounts, options)
+
     // 按顺序学习每门课程
   })
 

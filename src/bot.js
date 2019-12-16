@@ -379,7 +379,7 @@ class Bot {
 
   }
 
-  async goQuiz(lesson,num){
+  async goQuiz(lesson,num, option={}){
     let driver = this.driver
     let isFinish = lesson.isFinish;
     let id = lesson.id
@@ -467,7 +467,7 @@ class Bot {
       let displayed = await a.isDisplayed()
       console.log(" isDisplayed ", displayed)
 
-      driver.wait(function() {
+      await driver.wait(function() {
         return a.isDisplayed().then(function(isDisplayed) {
           return isDisplayed === true;
         });
@@ -554,7 +554,7 @@ class Bot {
     }
 
     if (couse) {
-      let { url, title } = couse
+      let { url, title, code } = couse
       // 第二次递归时，必须先访问url
       let startAt = new Date()
       await this.driver.get(url)
@@ -647,7 +647,7 @@ class Bot {
     let couse = CouseUrlMap[couseTitle]
     if( couse ){
 
-      let { url, title } = couse
+      let { url, title, code } = couse
 
       if (title == '习近平新时代中国特色社会主义思想') {
         jsonStr = answerList.makeXiAnswerJson("./db/answers/xi.txt")
