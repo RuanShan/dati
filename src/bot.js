@@ -200,7 +200,7 @@ class Bot {
    * @param {Object} options - type - 学习某一类型的章节
    * @param {*} res
    */
-  async learnCourse( options = {}) {
+  async learnCourse( options ) {
     if (this.recursiveCount >= 15) {
       return
     }
@@ -240,7 +240,7 @@ class Bot {
         } else if (url.includes('/mod/quiz/view')) {
           // 只有类型为答题时，再答题，以免多次答题
           if( typeFilter == type){
-            await this.goQuiz(lesson,lesson.position)
+            await this.goQuiz(lesson,lesson.position,options)
             isFinish = '完成'
           }
         } else {
@@ -286,7 +286,7 @@ class Bot {
   }
 
 
-  async learnModule(moduleCode) {
+  async learnModule(moduleCode,options) {
 
     logger.info(`课程${ this.couseTitle} 小节 ${moduleCode} 开始学习。`)
     let driver = this.driver
@@ -316,7 +316,7 @@ class Bot {
         } else if (url.includes('/mod/page/view')) {
           await this.readText(lesson)
         } else if (url.includes('/mod/quiz/view')) {
-          await this.goQuiz(lesson,lesson.position)
+          await this.goQuiz(lesson,lesson.position,options)
         } else {
           logger.error(`无法识别的课程url =${url}`)
         }
@@ -379,7 +379,7 @@ class Bot {
 
   }
 
-  async goQuiz(lesson,num, option={}){
+  async goQuiz(lesson,num, options){
     let driver = this.driver
     let isFinish = lesson.isFinish;
     let id = lesson.id
@@ -388,21 +388,21 @@ class Bot {
       console.log('course-----:', lesson);
       let url = lesson.url
       let lessonTitle = lesson.title
-      let { title } = CouseUrlMap[this.couseTitle]
+      let { title, code } = CouseUrlMap[this.couseTitle]
 
       console.log('this.couseTitle---:',this.couseTitle);
       if (title == '习近平新时代中国特色社会主义思想') {
-        await handleMaoGaiQuiz(driver, url, id ,num,true)
+        await handleMaoGaiQuiz(driver, url, id ,num,true,options,code)
       }else if(title == '国家开放大学学习指南'){
-        await handleZhiNanQuiz(driver, url, id ,num,true)
+        await handleZhiNanQuiz(driver, url, id ,num,true,options)
       }else if(title == '思想道德修养与法律基础'){
-        await handleSiXiuQuiz(driver, url, id ,num,true)
+        await handleSiXiuQuiz(driver, url, id ,num,true,options)
       }else if(title == '毛泽东思想和中国特色社会主义理论体系概论'){
-        await handleMaoQuiz(driver, url, id ,num,true)
+        await handleMaoQuiz(driver, url, id ,num,true,options)
       }else if (title == '马克思主义基本原理概论') {
-        await handleMaKeSiQuiz(driver, url, id ,num,true)
+        await handleMaKeSiQuiz(driver, url, id ,num,true,options)
       }else if (title == '中国近现代史纲要'){
-        await handleJinDaiShiQuiz(driver, url, id ,num,true)
+        await handleJinDaiShiQuiz(driver, url, id ,num,true,options)
       }
       console.log('this quiz is done');
     }
@@ -651,7 +651,7 @@ class Bot {
 
       if (title == '习近平新时代中国特色社会主义思想') {
         jsonStr = answerList.makeXiAnswerJson("./db/answers/xi.txt")
-        filename = './db/answers/xiList.json'
+        filename = './db/answers/'+code+'_xiList.json'
       }else if(title == '国家开放大学学习指南'){
         let answerList = new AnswerList()
         jsonStr = answerList.makeZhiNanAnswerJson("./db/answers/zhinan.txt")

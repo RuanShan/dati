@@ -12,7 +12,7 @@ const {
   handleCreateLog,
   handleLearnCourse,
   handleLearnCourses,
-  handleLearnByCodeModule,
+  handleLearnModuleByCode,
   handleGetCourseSumaries,
   handleLearnModuleOfAccounts,
   handleReadScore,
@@ -86,7 +86,7 @@ program.command('lcourse <course>')
 program.command('lmodule <course> <module>')
   .description('learn by code module')
   .action(async function(course, moduleCode) {
-    console.log("handleLearnByCodeModule ", moduleCode)
+    console.log("handleLearnModuleByCode ", moduleCode)
     let accounts = []
     if (program.account) {
       accounts = await getAccountsCsvByKey(accountfile)
@@ -97,7 +97,11 @@ program.command('lmodule <course> <module>')
         password: program.password
       })
     }
-    handleLearnByCodeModule(course, moduleCode, program.username, program.password)
+    let options = {
+      type: program.type,
+      submitquiz:'yes'
+    }
+    handleLearnModuleByCode(course, moduleCode, program.username, program.password,options)
   })
 
 program.command('readscore <course>')
@@ -175,7 +179,8 @@ program.command('learn [accountfile]')
       return
     }
     let options = {
-      type: program.type
+      type: program.type,
+      submitquiz:'yes'
     }
     // 取得所有账户信息
     // 为每个账户创建课程日志
@@ -225,7 +230,7 @@ program.command('lmodules <course> [moduleCode]')
       console.log("软件出现问题，请联系开发人员13322280797！")
       return
     }
-    console.log("handleLearnByCodeModule ", course, Number(course), moduleCode)
+    console.log("handleLearnModuleByCode ", course, Number(course), moduleCode)
     let accounts = []
     if (program.account) {
       accounts = await getAccounts(program.account)
@@ -249,8 +254,12 @@ program.command('lmodules <course> [moduleCode]')
     } else {
       moduleCodes = await getModuleIds(courseTitle)
     }
+    let options = {
+      type: program.type,
+      submitquiz:'yes'
+    }
 
-    await handleLearnModuleOfAccounts(accounts, courseTitle, moduleCodes)
+    await handleLearnModuleOfAccounts(accounts, courseTitle, moduleCodes, options)
   })
 
 program.parse(process.argv)

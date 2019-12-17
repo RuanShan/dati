@@ -6,6 +6,7 @@ const {
   Key,
   until
 } = require('selenium-webdriver');
+const fs = require('fs');
 
 const {answers} = require ('../../db/answers/xiList.json');
 
@@ -120,7 +121,7 @@ const awaitWrap = (promise) => {
   .catch(err => [err, null])
 }
 
-async function handleMaoGaiQuiz( driver, url, id ,num,isFirstPage){
+async function handleMaoGaiQuiz( driver, url, id ,num,isFirstPage,options,code){
   console.log('====================handleMaoGaiQuiz================');
   let xpath = "//div[@class='singlebutton quizstartbuttondiv']//button"
   //let queXpath = "//div[@class='que truefalse deferredfeedback notyetanswered']"
@@ -153,7 +154,9 @@ async function handleMaoGaiQuiz( driver, url, id ,num,isFirstPage){
   let level_1 = 0;
   let fakeQuestionNum = 0;
 
-  let jsonStr = answers
+  let jsonStr = JSON.parse(fs.readFileSync('./db/answers/'+code+'_xiList.json','utf8'));
+  jsonStr = jsonStr.answers
+  console.log('jsonStr----:',jsonStr);
   // let jsonStr = ''
 
   for (let i = 0; i < questions.length; i++) {
@@ -198,10 +201,23 @@ async function handleMaoGaiQuiz( driver, url, id ,num,isFirstPage){
   if(nextPage){
     console.log('=======has nextPage=======');
     await nextPage.click()
-    return await handleMaoGaiQuiz( driver, url, id ,num,false)
+    return await handleMaoGaiQuiz( driver, url, id ,num,false,options,code)
   }else if(submitPage){
     console.log('=======has submitPage=======');
     await submitPage.click()
+  }
+
+  console.log('options----:',options);
+
+  if(options.submitquiz == 'yes'){
+    const submitButton = await driver.findElements(By.css('.submitbtns button.btn-secondary'))
+    console.log('submitButton-----:',submitButton);
+    await submitButton[1].click()
+
+    await driver.wait(until.elementLocated(By.css('.confirmation-dialogue input.btn-primary')), 15000);
+    const ensureButton = await driver.findElements(By.css('.confirmation-dialogue input.btn-primary'))
+    console.log('ensureButton-----:',ensureButton);
+    await ensureButton[0].click()
   }
 }
 module.exports={

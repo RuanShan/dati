@@ -260,7 +260,7 @@ async function handleLearnModuleByCode(courseCode, moduleCode,username, password
 }
 
 // 学习账户中所有人的N节课
-async function handleLearnModuleOfAccounts(accounts, courseCode, moduleCodes ) {
+async function handleLearnModuleOfAccounts(accounts, courseCode, moduleCodes, options ) {
   let driver = await new Builder().forBrowser('chrome').build();
 
   let bot = new Bot(driver )
@@ -285,7 +285,7 @@ async function handleLearnModuleOfAccounts(accounts, courseCode, moduleCodes ) {
         await bot.login(username, password)
         let course = await bot.prepareForLearn(courseCode)
         if( course ){
-          success = await bot.learnModule(moduleCode)
+          success = await bot.learnModule(moduleCode,options)
         }else{
           console.error("没有找到课程", username, courseCode)
         }
@@ -295,7 +295,6 @@ async function handleLearnModuleOfAccounts(accounts, courseCode, moduleCodes ) {
         await bot.logout()
       }
     }
-
   }else{
     console.error("没有找到课程数据文件："+ courseCode )
   }
