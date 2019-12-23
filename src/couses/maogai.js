@@ -140,7 +140,6 @@ async function handleMaoGaiQuiz( driver, url, id ,num,isFirstPage,options,code){
     button.click() // 进入测试页面
   }
 
-  console.log('111111111111111111111111111111');
   await driver.wait(until.elementLocated(By.css(queSelector)), 15000);
   // 可能不存在
   const [err1, nextPage] = await awaitWrap(driver.findElement(By.xpath(nextPageXpath)))
@@ -156,7 +155,7 @@ async function handleMaoGaiQuiz( driver, url, id ,num,isFirstPage,options,code){
 
   let jsonStr = JSON.parse(fs.readFileSync('./db/answers/'+code+'_xiList.json','utf8'));
   jsonStr = jsonStr.answers
-  console.log('jsonStr----:',jsonStr);
+  // console.log('jsonStr----:',jsonStr);
   // let jsonStr = ''
 
   for (let i = 0; i < questions.length; i++) {
@@ -211,12 +210,12 @@ async function handleMaoGaiQuiz( driver, url, id ,num,isFirstPage,options,code){
 
   if(options.submitquiz == 'yes'){
     const submitButton = await driver.findElements(By.css('.submitbtns button.btn-secondary'))
-    console.log('submitButton-----:',submitButton);
+    console.log('submitButton-----:',submitButton.length);
     await submitButton[1].click()
 
     await driver.wait(until.elementLocated(By.css('.confirmation-dialogue input.btn-primary')), 15000);
     const ensureButton = await driver.findElements(By.css('.confirmation-dialogue input.btn-primary'))
-    console.log('ensureButton-----:',ensureButton);
+    console.log('ensureButton-----:',ensureButton.length);
     await ensureButton[0].click()
   }
 }

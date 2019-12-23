@@ -22,7 +22,10 @@ node app.js  --username=1921101203721 --password=19930930 lmodule 习近平新�
 
 node app.js  --account=accountx.csv --type=video lmodules 习近平新时代中国特色社会主义思想
 
+node app.js  --account=account.json --type=quiz --submitquiz=yes lmodules 3945
+
 ### 操作步骤
 1. node app.js  --username=1921101201025 --password=19941130 createlog 国家开放大学学习指南
-2. node app.js --type=video createModuleFile 习近平新时代中国特色社会主义思想
-3. node app.js  --account=account.json --type=video lmodules 毛泽东思想和中国特色社会主义理论体系概论
+2. node app.js --type=video createModuleFile 3945_习近平新时代中国特色社会主义思想
+3. node app.js  --account=account.json --type=video lmodules 3945_习近平新时代中国特色社会主义思想
+4. node app.js  --account=account.json --type=quiz --submitquiz=yes lmodules 3945_习近平新时代中国特色社会主义思想

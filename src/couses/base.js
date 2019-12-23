@@ -6,8 +6,9 @@ const {
   Key,
   until
 } = require('selenium-webdriver');
-const {answers} = require ('../../db/answers/zhinanList.json');
-async function parseCouseZhiNan(driver) {
+const fs = require('fs');
+
+async function parseCouseBase(driver) {
 
   let progressPath = "//div[@class='progress-bar']/span"
   let sectionl1Path = "//ul[@class='flexsections flexsections-level-1']/li"
@@ -37,14 +38,11 @@ async function parseCouseZhiNan(driver) {
   for (let i = 0; i < levelOne.length; i++) {
     let a = levelOne[i]
     let text = await a.getText()
-    let sectionId = await a.getAttribute('id')
-    console.log(`levelOne.text ${i} ${sectionId} ${text}`)
+    let id = await a.getAttribute('id')
+    console.log(`levelOne.text ${i} ${id} ${text}`)
     let levelTwo = await a.findElements(By.css(sectionl2Css))
     if (levelTwo.length == 0) {
-      console.log(`levelOne.text ${i} ${sectionId} ${text} 没有内容。`)
-      continue
-    }
-    if( /课程文件|资源更新区|电大资源区/.test( text )){
+      console.log(`levelOne.text ${i} ${id} ${text} 没有内容。`)
       continue
     }
     let b = levelTwo[0]
@@ -65,7 +63,7 @@ async function parseCouseZhiNan(driver) {
       let href = ''
       if (imgs.length >= 1){
         let src = await imgs[0].getAttribute('src')
-        if( src.includes('core_h.png') ){ //视频1：新时代党的建设总要求网页地址
+        if( src.includes('core_h.png') && text.includes('视频') ){ //视频1：新时代党的建设总要求网页地址
           type = 'video'
         }else if( src.includes('quiz_h.png')){
           type = 'quiz'
@@ -80,8 +78,6 @@ async function parseCouseZhiNan(driver) {
         href = await link.getAttribute('href')
       }
       let course = {
-        classId: classId, // 用于script调用，如完成视频
-        sectionId: sectionId.substring(8), // section-xxx
         title: text,
         type: type,
         isFinish: alt.substring(0, 3),
@@ -102,8 +98,8 @@ async function parseCouseZhiNan(driver) {
   return couseJson
 }
 
-async function handleZhiNanQuiz( driver, url, id ,num,isFirstPage,options,code){
-  console.log('====================handleZhiNanQuiz================');
+async function handleQuizBase( driver, url, id ,num,isFirstPage,options,code){
+  console.log('====================handleMaoQuiz================');
   let xpath = "//div[@class='singlebutton quizstartbuttondiv']//button"
   //let queXpath = "//div[@class='que truefalse deferredfeedback notyetanswered']"
   let queSelector = ".que"
@@ -122,7 +118,6 @@ async function handleZhiNanQuiz( driver, url, id ,num,isFirstPage,options,code){
     button.click() // 进入测试页面
   }
 
-  console.log('111111111111111111111111111111');
   await driver.wait(until.elementLocated(By.css(queSelector)), 15000);
   // 可能不存在
   const [err1, nextPage] = await awaitWrap(driver.findElement(By.xpath(nextPageXpath)))
@@ -135,9 +130,11 @@ async function handleZhiNanQuiz( driver, url, id ,num,isFirstPage,options,code){
   let keyWords1 = ['一', '二', '三', '四'];
   let level_1 = 0;
   let fakeQuestionNum = 0;
+  let filename = getFileNameByCode( code )
+  let jsonStr = JSON.parse(fs.readFileSync('./db/answers/'+filename,'utf8'));
+  jsonStr = jsonStr.answers
+  console.log('jsonStr---:', filename, typeof(jsonStr));
 
-  let jsonStr = answers
-  // let jsonStr = ''
   let keynum = 0
   for (let i = 0; i < questions.length; i++) {
     let questionEle = questions[i];
@@ -147,14 +144,14 @@ async function handleZhiNanQuiz( driver, url, id ,num,isFirstPage,options,code){
 
     let question = await content.getText()
     console.log('question---:',question);
-    if(keyWords1.indexOf(question[0]) != -1){
+    if(keyWords1.indexOf(question[0]) != -1&&question[1]=='、'){
       keynum = 0;
       level_1+=keyWords1.indexOf(question[0]);
       continue;
     }
-    console.log('jsonStr['+num+']['+level_1+']---:',jsonStr[num][level_1]);
-    console.log('keynum-fakeQuestionNum====:',keynum);
+    console.log('keynum====:',num,level_1,keynum, keynum-fakeQuestionNum);
     let key = jsonStr[num][level_1][keynum-fakeQuestionNum]
+    console.debug('jsonStr[num][level_1]---:',jsonStr[num][level_1]);
     console.log('key---:',key);
     for( let j = 0; j< answerInputs.length; j++){
       let answer = answerInputs[j];
@@ -163,15 +160,17 @@ async function handleZhiNanQuiz( driver, url, id ,num,isFirstPage,options,code){
       let b =  await label.getText()
       console.log('label--:',b);
       if(b.length==1){//pan duan ti
-        if(b==key.answer[2]){
+        if(b==key.answer){
           await label.click()
           console.log('chose '+b);
         }else{
           continue
         }
       }else{//xuan ze ti
-        let answerStr = key.answer.replace(/\s*/g,"").replace(".","").substring(1);
+        let answerStr = key.answer.replace(/\s*/g,"").replace(".","").replace("''","");
+        console.log('answerStr-----:',answerStr);
         let labelStr = b.replace(/\s*/g,"").replace(".","").substring(1)
+        console.log('labelStr---:',labelStr);
         if(answerStr.indexOf(labelStr)!=-1||answerStr=='全部'){
           console.log('chose '+b);
           console.log('type--:',await answer.getAttribute('type'));
@@ -193,7 +192,7 @@ async function handleZhiNanQuiz( driver, url, id ,num,isFirstPage,options,code){
   if(nextPage){
     console.log('=======has nextPage=======');
     await nextPage.click()
-    return await handleZhiNanQuiz( driver, url, id ,num,false,options,code)
+    return await handleQuizBase( driver, url, id ,num,false,options,code)
   }else if(submitPage){
     console.log('=======has submitPage=======');
     await submitPage.click()
@@ -211,12 +210,28 @@ async function handleZhiNanQuiz( driver, url, id ,num,isFirstPage,options,code){
   }
 }
 
+// return string: null
+function getFileNameByCode( code ){
+  //let jsonStr = JSON.parse(fs.readFileSync('./db/answers/'+code+'.json','utf8'));
+
+  const items = fs.readdirSync('./db/answers/');
+
+
+
+  const dirs = items.filter(item => {
+    // /^code*+.json$/
+    let reg = new RegExp( `^${code}.*json$`)
+    return reg.test( item )
+  })
+  return dirs[0]
+}
+
 const awaitWrap = (promise) => {
  return promise
   .then(data => [null, data])
   .catch(err => [err, null])
 }
 module.exports={
-  parseCouseZhiNan,
-  handleZhiNanQuiz
+  parseCouseBase,
+  handleQuizBase
 }

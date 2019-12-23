@@ -60,6 +60,7 @@ const { parseCouseSiXiu, handleSiXiuQuiz } = require('./couses/sixiu')
 const { parseCouseMao, handleMaoQuiz } = require('./couses/mao')
 const { parseCouseMaKeSi, handleMaKeSiQuiz } = require('./couses/makesi')
 const { parseCouseJinDaiShi, handleJinDaiShiQuiz } = require('./couses/jindaishi')
+const { parseCouseBase, handleQuizBase } = require('./couses/base')
 
 class Bot {
 
@@ -237,7 +238,7 @@ class Bot {
         } else if (url.includes('/mod/page/view')) {
           await this.readText(lesson)
           isFinish = '完成'
-        } else if (url.includes('/mod/quiz/view')) {
+        } else if (type== 'quiz') {
           // 只有类型为答题时，再答题，以免多次答题
           if( typeFilter == type){
             await this.goQuiz(lesson,lesson.position,options)
@@ -315,8 +316,8 @@ class Bot {
           success = await this.watchVideoByApi(lesson)
         } else if (url.includes('/mod/page/view')) {
           await this.readText(lesson)
-        } else if (url.includes('/mod/quiz/view')) {
-          await this.goQuiz(lesson,lesson.position,options)
+        } else if (type== 'quiz') {
+          await this.goQuiz(lesson, lesson.position,options)
         } else {
           logger.error(`无法识别的课程url =${url}`)
         }
@@ -381,28 +382,32 @@ class Bot {
 
   async goQuiz(lesson,num, options){
     let driver = this.driver
+
     let isFinish = lesson.isFinish;
     let id = lesson.id
 
     if (isFinish == '未完成') {
       console.log('course-----:', lesson);
-      let url = lesson.url
+      //let url = lesson.url
       let lessonTitle = lesson.title
-      let { title, code } = CouseUrlMap[this.couseTitle]
+      let { title, code, host } = CouseUrlMap[this.couseTitle]
+      let url = `http://${host}/mod/quiz/view.php?id=${id}`
 
       console.log('this.couseTitle---:',this.couseTitle);
       if (title == '习近平新时代中国特色社会主义思想') {
         await handleMaoGaiQuiz(driver, url, id ,num,true,options,code)
       }else if(title == '国家开放大学学习指南'){
-        await handleZhiNanQuiz(driver, url, id ,num,true,options)
+        await handleZhiNanQuiz(driver, url, id ,num,true,options,code)
       }else if(title == '思想道德修养与法律基础'){
-        await handleSiXiuQuiz(driver, url, id ,num,true,options)
+        await handleQuizBase(driver, url, id ,num,true,options,code)
       }else if(title == '毛泽东思想和中国特色社会主义理论体系概论'){
-        await handleMaoQuiz(driver, url, id ,num,true,options)
+        await handleQuizBase(driver, url, id ,num,true,options,code)
       }else if (title == '马克思主义基本原理概论') {
-        await handleMaKeSiQuiz(driver, url, id ,num,true,options)
+        await handleQuizBase(driver, url, id ,num,true,options,code)
       }else if (title == '中国近现代史纲要'){
-        await handleJinDaiShiQuiz(driver, url, id ,num,true,options)
+        await handleJinDaiShiQuiz(driver, url, id ,num,true,options,code)
+      }else if (code == '4387'){  // 中国特色社会主义理论体系概论
+        await handleQuizBase(driver, url, id ,num,true,options,code)
       }
       console.log('this quiz is done');
     }
@@ -655,23 +660,27 @@ class Bot {
       }else if(title == '国家开放大学学习指南'){
         let answerList = new AnswerList()
         jsonStr = answerList.makeZhiNanAnswerJson("./db/answers/zhinan.txt")
-        filename = './db/answers/zhinanList.json'
+        filename = './db/answers/'+code+'_zhinanList.json'
       }else if(title == '思想道德修养与法律基础'){
         let answerList = new AnswerList()
         jsonStr = answerList.makeSiXiuAnswerJson("./db/answers/sixiu.txt")
-        filename = './db/answers/sixiuList.json'
+        filename = './db/answers/'+code+'_sixiuList.json'
       }else if(title == '毛泽东思想和中国特色社会主义理论体系概论'){
         let answerList = new AnswerList()
         jsonStr = answerList.makeMaoAnswerJson("./db/answers/mao.txt")
-        filename = './db/answers/maoList.json'
+        filename = './db/answers/'+code+'_maoList.json'
       }else if(title == '马克思主义基本原理概论'){
         let answerList = new AnswerList()
         jsonStr = answerList.makeMaoAnswerJson("./db/answers/makesi.txt")
-        filename = './db/answers/makesiList.json'
+        filename = './db/answers/'+code+'_makesiList.json'
       }else if(title == '中国近现代史纲要'){
         let answerList = new AnswerList()
         jsonStr = answerList.makeJinDaiShiAnswerJson("./db/answers/jindaishi.txt")
-        filename = './db/answers/jindaishiList.json'
+        filename = './db/answers/'+code+'_jindaishiList.json'
+      }else{
+        let answerList = new AnswerList()
+        jsonStr = answerList.makeAnswerJsonBase(`./db/answers/${code}_${title}.txt`)
+        filename = `./db/answers/${code}_${title}.json`
       }
       if( filename ){
         fs.writeFile(filename, JSON.stringify({answers:jsonStr}), (err) => {

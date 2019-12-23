@@ -303,6 +303,53 @@ async function handleLearnModuleOfAccounts(accounts, courseCode, moduleCodes, op
   fs.writeFileSync(saveFilename, JSON.stringify(results));
 }
 
+// 学习账户中所有人的N节课
+// 将账号循环放在外面，module放在里面，提高效率，但是处理视频模块
+async function handleLearnModuleOfAccounts2(accounts, courseCode, moduleCodes, options ) {
+  let driver = await new Builder().forBrowser('chrome').build();
+
+  let bot = new Bot(driver )
+  console.debug("开始学习小节, 人数=", accounts.length)
+  // let username = '1934001474084'; // 1934001474084
+  // let password = '19930902'       // 19930902
+
+  // '04931-习近平新时代中国特色社会主义思想', 这里不再删除数字，课程前可能有代码
+  let filename = `./db/subjects/${courseCode}.json`
+  let log = await bot.getLog( courseCode, { filename })
+  let results = []
+  if( log ){
+
+      for (let i = 0; i < accounts.length; i++) {
+        let account = accounts[i]
+        let username = account.username
+        let password = account.password
+        let success = false
+        console.debug("bot.learnModule ", username);
+        await bot.login(username, password)
+        let course = await bot.prepareForLearn(courseCode)
+        if( course ){
+          for (let j = 0; j < moduleCodes.length; j++) {
+            let moduleCode = moduleCodes[j]
+            success = await bot.learnModule(moduleCode,options)
+            console.info( `${username} ${moduleCode} 是否学完 ${success}`)
+            results.push( { username, moduleCode, success})
+          }
+        }else{
+          console.error("没有找到课程", username, courseCode)
+        }
+        await bot.closeOtherTabs( )
+
+        await bot.logout()
+      }
+
+  }else{
+    console.error("没有找到课程数据文件："+ courseCode )
+  }
+  await driver.quit()
+  let saveFilename =  `./db/students/module.json`
+  fs.writeFileSync(saveFilename, JSON.stringify(results));
+}
+
 async function saveUserJson(username, userInfo) {
   let filename =  './db/students/' + username  + '.json'
   fs.writeFileSync(filename, JSON.stringify(userInfo));
@@ -327,6 +374,7 @@ module.exports = {
   handleGetCourseSumaries,
   handleLearnModuleByCode,
   handleLearnModuleOfAccounts,
+  handleLearnModuleOfAccounts2,
   handleReadScore,
   getAccountsCourseCode
 }

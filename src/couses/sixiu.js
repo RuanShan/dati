@@ -102,7 +102,7 @@ async function parseCouseSiXiu(driver) {
   return couseJson
 }
 
-async function handleSiXiuQuiz( driver, url, id ,num,isFirstPage){
+async function handleSiXiuQuiz( driver, url, id ,num,isFirstPage,options,code){
   console.log('====================handleSiXiuQuiz================');
   let xpath = "//div[@class='singlebutton quizstartbuttondiv']//button"
   //let queXpath = "//div[@class='que truefalse deferredfeedback notyetanswered']"
@@ -152,7 +152,7 @@ async function handleSiXiuQuiz( driver, url, id ,num,isFirstPage){
       level_1+=keyWords1.indexOf(question[0]);
       continue;
     }
-    console.log('keynum-fakeQuestionNum====:',keynum);
+    console.log('keynum====:',num,level_1,keynum);
     let key = jsonStr[num][level_1][keynum-fakeQuestionNum]
     console.log('key---:',key);
     for( let j = 0; j< answerInputs.length; j++){
@@ -194,10 +194,20 @@ async function handleSiXiuQuiz( driver, url, id ,num,isFirstPage){
   if(nextPage){
     console.log('=======has nextPage=======');
     await nextPage.click()
-    return await handleSiXiuQuiz( driver, url, id ,num,false)
+    return await handleSiXiuQuiz( driver, url, id ,num,false,options,code)
   }else if(submitPage){
     console.log('=======has submitPage=======');
     await submitPage.click()
+  }
+  if(options.submitquiz == 'yes'){
+    const submitButton = await driver.findElements(By.css('.submitbtns button.btn-secondary'))
+    console.log('submitButton-----:',submitButton);
+    await submitButton[1].click()
+
+    await driver.wait(until.elementLocated(By.css('.confirmation-dialogue input.btn-primary')), 15000);
+    const ensureButton = await driver.findElements(By.css('.confirmation-dialogue input.btn-primary'))
+    console.log('ensureButton-----:',ensureButton);
+    await ensureButton[0].click()
   }
 }
 

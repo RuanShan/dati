@@ -102,7 +102,7 @@ async function parseCouseJinDaiShi(driver) {
   return couseJson
 }
 
-async function handleJinDaiShiQuiz( driver, url, id ,num,isFirstPage){
+async function handleJinDaiShiQuiz( driver, url, id ,num,isFirstPage,options,code){
   console.log('====================handleJinDaiShiQuiz================');
   let xpath = "//div[@class='singlebutton quizstartbuttondiv']//button"
   //let queXpath = "//div[@class='que truefalse deferredfeedback notyetanswered']"
@@ -194,10 +194,21 @@ async function handleJinDaiShiQuiz( driver, url, id ,num,isFirstPage){
   if(nextPage){
     console.log('=======has nextPage=======');
     await nextPage.click()
-    return await handleJinDaiShiQuiz( driver, url, id ,num,false)
+    return await handleJinDaiShiQuiz( driver, url, id ,num,false,options,code)
   }else if(submitPage){
     console.log('=======has submitPage=======');
     await submitPage.click()
+  }
+
+  if(options.submitquiz == 'yes'){
+    const submitButton = await driver.findElements(By.css('.submitbtns button.btn-secondary'))
+    console.log('submitButton-----:',submitButton);
+    await submitButton[1].click()
+
+    await driver.wait(until.elementLocated(By.css('.confirmation-dialogue input.btn-primary')), 15000);
+    const ensureButton = await driver.findElements(By.css('.confirmation-dialogue input.btn-primary'))
+    console.log('ensureButton-----:',ensureButton);
+    await ensureButton[0].click()
   }
 }
 

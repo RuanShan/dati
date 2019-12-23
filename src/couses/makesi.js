@@ -6,6 +6,7 @@ const {
   Key,
   until
 } = require('selenium-webdriver');
+const fs = require('fs');
 const {answers} = require ('../../db/answers/makesiList.json');
 async function parseCouseMaKeSi(driver) {
 
@@ -102,7 +103,7 @@ async function parseCouseMaKeSi(driver) {
   return couseJson
 }
 
-async function handleMaKeSiQuiz( driver, url, id ,num,isFirstPage){
+async function handleMaKeSiQuiz( driver, url, id ,num,isFirstPage,options,code){
   console.log('====================handleMaKeSiQuiz================');
   let xpath = "//div[@class='singlebutton quizstartbuttondiv']//button"
   //let queXpath = "//div[@class='que truefalse deferredfeedback notyetanswered']"
@@ -136,7 +137,8 @@ async function handleMaKeSiQuiz( driver, url, id ,num,isFirstPage){
   let level_1 = 0;
   let fakeQuestionNum = 0;
 
-  let jsonStr = answers
+  let jsonStr = JSON.parse(fs.readFileSync('./db/answers/'+code+'_makesiList.json','utf8'));
+  jsonStr = jsonStr.answers
   // let jsonStr = ''
   let keynum = 0
   for (let i = 0; i < questions.length; i++) {
@@ -194,10 +196,23 @@ async function handleMaKeSiQuiz( driver, url, id ,num,isFirstPage){
   if(nextPage){
     console.log('=======has nextPage=======');
     await nextPage.click()
-    return await handleMaKeSiQuiz( driver, url, id ,num,false)
+    return await handleMaKeSiQuiz( driver, url, id ,num,false,options,code)
   }else if(submitPage){
     console.log('=======has submitPage=======');
     await submitPage.click()
+  }
+
+  console.log('options----:',options);
+
+  if(options.submitquiz == 'yes'){
+    const submitButton = await driver.findElements(By.css('.submitbtns button.btn-secondary'))
+    console.log('submitButton-----:',submitButton);
+    await submitButton[1].click()
+
+    await driver.wait(until.elementLocated(By.css('.confirmation-dialogue input.btn-primary')), 15000);
+    const ensureButton = await driver.findElements(By.css('.confirmation-dialogue input.btn-primary'))
+    console.log('ensureButton-----:',ensureButton);
+    await ensureButton[0].click()
   }
 }
 

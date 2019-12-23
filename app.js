@@ -15,6 +15,7 @@ const {
   handleLearnModuleByCode,
   handleGetCourseSumaries,
   handleLearnModuleOfAccounts,
+  handleLearnModuleOfAccounts2,
   handleReadScore,
   getAccountsCourseCode
 } = require('./src/index')
@@ -28,6 +29,7 @@ program
   .option('-p, --password <password>', 'user password')
   .option('-a, --account <accountfile>', 'account file')
   .option('-m, --modulefile <modulefile>', 'module file')
+  .option('-s, --submitquiz <yes|no>', 'submit quiz  yes or no')
   .option('-t, --type <type>', 'module type') // 学习的类型
 
 program.command('createlog <course>')
@@ -99,7 +101,7 @@ program.command('lmodule <course> <module>')
     }
     let options = {
       type: program.type,
-      submitquiz:'yes'
+      submitquiz: program.submitquiz,
     }
     handleLearnModuleByCode(course, moduleCode, program.username, program.password,options)
   })
@@ -180,7 +182,7 @@ program.command('learn [accountfile]')
     }
     let options = {
       type: program.type,
-      submitquiz:'yes'
+      submitquiz: program.submitquiz,
     }
     // 取得所有账户信息
     // 为每个账户创建课程日志
@@ -235,12 +237,6 @@ program.command('lmodules <course> [moduleCode]')
     if (program.account) {
       accounts = await getAccounts(program.account)
     }
-    if (program.username) {
-      accounts.push({
-        username: program.username,
-        password: program.password
-      })
-    }
 
     let courseTitle = course
     if (Number(course)) {
@@ -256,10 +252,13 @@ program.command('lmodules <course> [moduleCode]')
     }
     let options = {
       type: program.type,
-      submitquiz:'yes'
+      submitquiz: program.submitquiz,
     }
-
-    await handleLearnModuleOfAccounts(accounts, courseTitle, moduleCodes, options)
+    if( program.type == 'video'){
+      await handleLearnModuleOfAccounts(accounts, courseTitle, moduleCodes, options)
+    }else{
+      await handleLearnModuleOfAccounts2(accounts, courseTitle, moduleCodes, options)
+    }
   })
 
 program.parse(process.argv)
