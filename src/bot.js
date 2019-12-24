@@ -405,7 +405,7 @@ class Bot {
       }else if (title == '马克思主义基本原理概论') {
         await handleQuizBase(driver, url, id ,num,true,options,code)
       }else if (title == '中国近现代史纲要'){
-        await handleJinDaiShiQuiz(driver, url, id ,num,true,options,code)
+        await handleQuizBase(driver, url, id ,num,true,options,code)
       }else if (code == '4387'){  // 中国特色社会主义理论体系概论
         await handleQuizBase(driver, url, id ,num,true,options,code)
       }
