@@ -262,11 +262,19 @@ program.command('lmodules <course> [moduleCode]')
     }
   })
 
-program.command('lfinal <course>')
+program.command('lfinal')
   .description('handlelfinal')
-  .action(function(course) {
-    console.log("lfinal ", course, program.username, program.password)
-    handleLearnFinal(course, program.username, program.password)
+  .action(async function(course,accountfile) {
+    console.log('accountfile----:'.accountfile);
+    let accounts = []
+    if (program.account) {
+      accounts = await getAccounts(program.account)
+    }
+
+    for(let i=0;i<accounts.length;i++){
+      console.log("lfinal ", course, accounts[i].username, accounts[i].password)
+      handleLearnFinal(accounts[i].subject, accounts[i].username, accounts[i].password)
+    }
   })
 
 program.parse(process.argv)
