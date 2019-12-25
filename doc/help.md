@@ -14,7 +14,7 @@ node app.js all
 node app.js all --type=video
 node app.js initdb
 node app.js learn --type=video
-
+node app.js --account=account.json lfinal  //learn final 
 ###生成学习用moduleids 文件
 node app.js --type=video createModuleFile 习近平新时代中国特色社会主义思想
 
