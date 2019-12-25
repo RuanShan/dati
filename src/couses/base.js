@@ -206,6 +206,7 @@ async function handleQuizBase( driver, url, id ,num,isFirstPage,options,code){
     await driver.wait(until.elementLocated(By.css('.confirmation-dialogue input.btn-primary')), 15000);
     const ensureButton = await driver.findElements(By.css('.confirmation-dialogue input.btn-primary'))
     console.log('ensureButton-----:',ensureButton);
+    // 提交后等 300ms，以免直接切换页面，请求没有发到服务器端？
     await ensureButton[0].click()
   }
 }

@@ -240,7 +240,7 @@ async function handleLearnCourse(courseCode, username, password) {
 }
 
 // 学习某一个人的一节课
-async function handleLearnModuleByCode(courseCode, moduleCode,username, password) {
+async function handleLearnModuleByCode(courseCode, moduleCode,username, password, options) {
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver, {username})
   console.debug("开始学习小节")
@@ -250,7 +250,7 @@ async function handleLearnModuleByCode(courseCode, moduleCode,username, password
   if( log ){
     await bot.login(username, password)
     let course = await bot.prepareForLearn(courseCode)
-    let success = await bot.learnModule(moduleCode)
+    let success = await bot.learnModule(moduleCode, options)
 
 
   }else{
