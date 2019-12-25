@@ -17,7 +17,8 @@ const {
   handleLearnModuleOfAccounts,
   handleLearnModuleOfAccounts2,
   handleReadScore,
-  getAccountsCourseCode
+  getAccountsCourseCode,
+  handleLearnFinal
 } = require('./src/index')
 
 // example: node app.js -- createlog 4255 #毛泽东思想和中国特色社会主义理论体
@@ -103,7 +104,7 @@ program.command('lmodule <course> <module>')
       type: program.type,
       submitquiz: program.submitquiz,
     }
-    handleLearnModuleByCode(course, moduleCode, program.username, program.password,options)
+    handleLearnModuleByCode(course, moduleCode, program.username, program.password, options)
   })
 
 program.command('readscore <course>')
@@ -139,16 +140,16 @@ program.command('checkin [accountfile]')
 
   })
 
-  //  根据账号，课程名称，取得科目代码
-  program.command('getcode [accountfile]')
-    .description('checkin all accounts, support json, csv')
-    .action(async function(accountfile) {
-      // [{username, password, subject}]
-      let accounts = await getAccounts(accountfile)
+//  根据账号，课程名称，取得科目代码
+program.command('getcode [accountfile]')
+  .description('checkin all accounts, support json, csv')
+  .action(async function(accountfile) {
+    // [{username, password, subject}]
+    let accounts = await getAccounts(accountfile)
 
-      console.log("检查账户登录...", accountfile)
+    console.log("检查账户登录...", accountfile)
 
-      await getAccountsCourseCode(accounts)
+    await getAccountsCourseCode(accounts)
 
   })
 // 根据网络数据，建立学习进度数据文件
@@ -232,7 +233,7 @@ program.command('lmodules <course> [moduleCode]')
       console.log("软件出现问题，请联系开发人员13322280797！")
       return
     }
-    console.log("handleLearnModuleByCode ", course, Number(course), moduleCode)
+    console.log("handleLearnModuleByCode ", course, program.type, Number(course), moduleCode)
     let accounts = []
     if (program.account) {
       accounts = await getAccounts(program.account)
@@ -254,11 +255,18 @@ program.command('lmodules <course> [moduleCode]')
       type: program.type,
       submitquiz: program.submitquiz,
     }
-    if( program.type == 'video'){
+    if (program.type == 'video') {
       await handleLearnModuleOfAccounts(accounts, courseTitle, moduleCodes, options)
-    }else{
+    } else {
       await handleLearnModuleOfAccounts2(accounts, courseTitle, moduleCodes, options)
     }
+  })
+
+program.command('lfinal <course>')
+  .description('handlelfinal')
+  .action(function(course) {
+    console.log("lfinal ", course, program.username, program.password)
+    handleLearnFinal(course, program.username, program.password)
   })
 
 program.parse(process.argv)
@@ -301,6 +309,9 @@ async function getModuleIds(course) {
 }
 
 async function getAccountsJsonByKey(filename) {
+  console.log('==============getAccountsJsonByKey==============');
+  console.log('filename---:', filename);
+  console.log('program---:', program);
   // 检查当前时间 2020-01-01
 
   let accounts = []

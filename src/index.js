@@ -365,6 +365,22 @@ function isCouseJsonExists(username, courseTitle) {
 }
 
 
+async function handleLearnFinal(courseCode, username, password) {
+  if( !username || !password){
+    throw  new Error( "用户名和密码是必须的")
+  }
+
+  let driver = await new Builder().forBrowser('chrome').build();
+  let bot = new Bot(driver)
+  console.log(" bot doing profile a course")
+    // 1934001474084
+    // 19930902
+  await bot.login(username, password)
+  await bot.prepareForLearn(courseCode)
+  await bot.learnFinal(courseCode)
+}
+
+
 module.exports = {
   handleAccountsCheckin,
   handleCreateDb,
@@ -376,5 +392,6 @@ module.exports = {
   handleLearnModuleOfAccounts,
   handleLearnModuleOfAccounts2,
   handleReadScore,
-  getAccountsCourseCode
+  getAccountsCourseCode,
+  handleLearnFinal
 }
