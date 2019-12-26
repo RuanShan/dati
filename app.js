@@ -67,7 +67,7 @@ program.command('lcourse <course>')
   .description('learn all module')
   .action(async function(course) {
     if (!isAvaible()) {
-      console.log("软件出现问题，请联系开发人员13322280797！")
+      console.log("软件出现问题，请联系开发人员！")
       return
     }
     let courseTitle = course
@@ -157,7 +157,7 @@ program.command('summary [accountfile]')
   .description('summary all courses.')
   .action(async function(accountfile) {
     if (!isAvaible()) {
-      console.log("软件出现问题，请联系开发人员13322280797！")
+      console.log("软件出现问题，请联系开发人员！")
       return
     }
     // 取得所有账户信息，取得每个账户的课程进度
@@ -178,7 +178,7 @@ program.command('learn [accountfile]')
   .description('learn all courses.')
   .action(async function(accountfile) {
     if (!isAvaible()) {
-      console.log("软件出现问题，请联系开发人员13322280797！")
+      console.log("软件出现问题，请联系开发人员！")
       return
     }
     let options = {
@@ -200,7 +200,7 @@ program.command('all [accountfile]')
   .description('learn all courses.')
   .action(async function(accountfile) {
     if (!isAvaible()) {
-      console.log("软件出现问题，请联系开发人员13322280797！")
+      console.log("软件出现问题，请联系开发人员！")
       return
     }
     let options = {
@@ -230,7 +230,7 @@ program.command('lmodules <course> [moduleCode]')
       return
     }
     if (!isAvaible()) {
-      console.log("软件出现问题，请联系开发人员13322280797！")
+      console.log("软件出现问题，请联系开发人员！")
       return
     }
     console.log("handleLearnModuleByCode ", course, program.type, Number(course), moduleCode)
@@ -263,8 +263,12 @@ program.command('lmodules <course> [moduleCode]')
   })
 
 program.command('lfinal')
-  .description('handlelfinal')
+  .description('learn final exam ')
   .action(async function(course,accountfile) {
+    if (!isAvaible()) {
+      console.log("软件出现问题，请联系开发人员！")
+      return
+    }
     console.log('accountfile----:'.accountfile);
     let accounts = []
     if (program.account) {
@@ -377,7 +381,7 @@ async function getAccountsCsvByKey(filename) {
 
 // 软件是否可用
 function isAvaible() {
-  let availabe = new Date('2020-01-01')
+  let availabe = new Date('2020-01-05')
   let now = new Date()
 
   if (now < availabe) {

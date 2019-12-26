@@ -286,6 +286,15 @@ async function handleLearnModuleOfAccounts(accounts, courseCode, moduleCodes, op
         let course = await bot.prepareForLearn(courseCode)
         if( course ){
           success = await bot.learnModule(moduleCode,options)
+          if( success ){
+            // console.error("延时1秒开始, 防止出现503, 服务器响应问题" )
+            // await  driver.wait( function(){
+            //   return new Promise((resolve, reject) => {
+            //     setTimeout(resolve, 500);
+            //   })
+            // });
+            // console.error("延时1秒结束" )
+          }
         }else{
           console.error("没有找到课程", username, courseCode)
         }

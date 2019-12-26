@@ -119,7 +119,16 @@ async function handleZhiNanQuiz( driver, url, id ,num,isFirstPage,options,code){
     await driver.get(url)
     await driver.wait(until.elementLocated(By.xpath(xpath)), 15000);
     let button = await driver.findElement(By.xpath(xpath))
-    button.click() // 进入测试页面
+    console.error("isFirstPage 延时1秒开始, 防止出现503, 服务器响应问题" )
+    let date = new Date()
+    await  driver.wait( function(){
+      return new Promise((resolve, reject) => {
+        console.error("isFirstPage 延时1秒" )
+        setTimeout(()=>{ resolve(true)}, 1500);
+      })
+    });
+    console.error("isFirstPage 延时1秒结束", (new Date()).getTime() - date.getTime()  )
+    await button.click() // 进入测试页面
   }
 
   console.log('111111111111111111111111111111');
