@@ -275,10 +275,13 @@ program.command('lfinal')
       accounts = await getAccounts(program.account)
     }
 
-    for(let i=0;i<accounts.length;i++){
-      console.log("lfinal ", course, accounts[i].username, accounts[i].password)
-      handleLearnFinal(accounts[i].subject, accounts[i].username, accounts[i].password)
+    let courseTitle = course
+    if (Number(course)) {
+      courseTitle = getCourseNameByCode(course)
     }
+
+    await  handleLearnFinal(accounts, courseTitle )
+
   })
 
 program.parse(process.argv)
@@ -381,7 +384,7 @@ async function getAccountsCsvByKey(filename) {
 
 // 软件是否可用
 function isAvaible() {
-  let availabe = new Date('2020-01-05')
+  let availabe = new Date('2020-07-05')
   let now = new Date()
 
   if (now < availabe) {

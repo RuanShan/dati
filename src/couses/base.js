@@ -138,7 +138,6 @@ async function handleQuizBase( driver, url, id ,num,isFirstPage,options,code){
 
   let keyWords1 = ['一', '二', '三', '四'];
   let level_1 = 0;
-  let fakeQuestionNum = 0;
   let filename = getFileNameByCode( code )
   let jsonStr = JSON.parse(fs.readFileSync('./db/answers/'+filename,'utf8'));
   jsonStr = jsonStr.answers
@@ -154,14 +153,15 @@ async function handleQuizBase( driver, url, id ,num,isFirstPage,options,code){
     let question = await content.getText()
     console.log('question---:',question);
     if(keyWords1.indexOf(question[0]) != -1&&question[1]=='、'){
-      keynum = 0;
-      level_1+=keyWords1.indexOf(question[0]);
+      keynum = 0; // 每一道题的下标
+      level_1=keyWords1.indexOf(question[0]);
       continue;
     }
-    console.log('keynum====:',num,level_1,keynum, keynum-fakeQuestionNum);
-    let key = jsonStr[num][level_1][keynum-fakeQuestionNum]
+    console.log('keynum====:',num,level_1,keynum, keynum);
+    let key = jsonStr[num][level_1][keynum]
     console.debug('jsonStr[num][level_1]---:',jsonStr[num][level_1]);
     console.log('key---:',key);
+    // 处理每一道题的所有选项循环
     for( let j = 0; j< answerInputs.length; j++){
       let answer = answerInputs[j];
       let label = answerLabels[j]

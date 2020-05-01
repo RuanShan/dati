@@ -239,7 +239,7 @@ class Bot {
    * @param {Object} options - type - 学习某一类型的章节
    * @param {*} res
    */
-  async learnCourse(options) {
+  async learnCourse(options={}) {
     if (this.recursiveCount >= 15) {
       return
     }
@@ -464,7 +464,8 @@ class Bot {
     let isFinish = lesson.isFinish;
     let id = lesson.id
     let url = lesson.url
-
+    let classId = lesson.classId
+    let finalFilename = getCourseNameByCode( classId )
 
     await driver.get(url)
     await driver.wait(until.elementLocated(By.css('.singlebutton button.btn-secondary')), 15000);
@@ -474,7 +475,7 @@ class Bot {
     await driver.wait(until.elementLocated(By.css('iframe')), 15000);
     const textBody = await driver.findElement(By.css('iframe'))
 
-    let answerText = fs.readFileSync('./demo/demo/毛泽东建设什么样的党.txt','utf8')
+    let answerText = fs.readFileSync(`./db/subjects/${finalFilename}_final.txt`,'utf8')
     textBody.sendKeys(Key.CONTROL, "a", Key.NULL,answerText);
 
     await driver.wait(until.elementLocated(By.css('.form-group input.btn-primary')), 15000);
@@ -502,7 +503,8 @@ class Bot {
       await driver.get(`http://${course.host}/mod/url/view.php?id=${id}`);
       // 可能被重定向到 xxx.pdf
       try {
-        let video = await driver.wait(until.elementLocated(By.tagName('video')), 10000);
+        // 超时15秒，多等点，网络有时慢
+        let video = await driver.wait(until.elementLocated(By.tagName('video')), 15000);
         let script = `$.ajaxSetup({ async : false}); var res = null; $.getJSON('/theme/blueonionre/modulesCompletion.php?cmid=${id}&id=${classId}&sectionid=${sectionId}', function(data){ res = data; }); return res;`
         let res = await driver.executeScript(script);
         console.log('视频播放成功', typeof(res), res);
@@ -612,30 +614,28 @@ class Bot {
   }
 
   async learnFinal(courseCode) {
-    console.log('============learnFinal=============');
-    console.log('courseCode---:', courseCode);
 
-    this.couseTitle = courseCode || this.couseTitle
-    console.debug("profileCouse=", courseCode, CouseUrlMap);
-    let couse = null
-    if (courseCode) {
-      couse = CouseUrlMap[courseCode]
+    // this.couseTitle = courseCode || this.couseTitle
+    // console.debug("profileCouse=", courseCode, CouseUrlMap);
+    // let couse = null
+    // if (courseCode) {
+    //   couse = CouseUrlMap[courseCode]
+    //
+    // } else {
+    //   couse = CouseUrlMap[this.couseTitle]
+    // }
 
-    } else {
-      couse = CouseUrlMap[this.couseTitle]
-    }
-
-    if (couse) {
-      let {
-        url,
-        title,
-        code
-      } = couse
-
-      if (title == '毛泽东思想和中国特色社会主义理论体系概论') {
-        this.courseInfo = await parseCouseMaoGai(this.driver)
-      }
-    }
+    // if (couse) {
+    //   let {
+    //     url,
+    //     title,
+    //     code
+    //   } = couse
+    //
+    //   if (title == '毛泽东思想和中国特色社会主义理论体系概论') {
+    //     this.courseInfo = await parseCouseMaoGai(this.driver)
+    //   }
+    // }
 
     let driver = this.driver
     let moduleStatus = this.courseInfo.status
@@ -643,7 +643,7 @@ class Bot {
     for (let i = 0; i < moduleStatus.length; i++) {
       let lesson = moduleStatus[i];
 
-      if (lesson.title == '终结性考试') {
+      if (lesson.title == '终结性考试' && lesson.type =='assign') {
         await this.goFinal(lesson)
       }
     }
@@ -907,7 +907,23 @@ class Bot {
 //   await driver.findElement(By.id('btnLogin')).click()
 //
 // }
+function getCourseNameByCode(code) {
+  // liaoning
+  if (code == '4372') return '4372_毛泽东思想和中国特色社会主义理论体系概论'
+  if (code == '3935') return '3935_马克思主义基本原理概论'
+  if (code == '3945') return '3945_习近平新时代中国特色社会主义思想'
+  if (code == '4065') return '4065_习近平新时代中国特色社会主义思想'
+  if (code == '3937') return '3937_思想道德修养与法律基础'
+  if (code == '4374') return '4374_思想道德修养与法律基础'
+  if (code == '3944') return '3944_中国近现代史纲要'
+  if (code == '4373') return '4373_中国近现代史纲要'
+  if (code == '4387') return '4387_中国特色社会主义理论体系概论'
+  // heilongjiang
+  if (code == '4498') return '4498_中国特色社会主义理论体系概论'
 
+  return null
+
+}
 
 
 

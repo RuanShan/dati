@@ -82,6 +82,8 @@ async function parseCouseMaoGai(driver) {
           type = 'quiz'
         }else if( src.includes('page_h.png')){
           type = 'page'
+        }else if( src.includes('assign_h.png')){
+          type = 'assign'
         }
       }
 
@@ -160,13 +162,13 @@ async function handleMaoGaiQuiz( driver, url, id ,num,isFirstPage,options,code){
 
   let keyWords1 = ['一', '二', '三', '四'];
   let level_1 = 0;
-  let fakeQuestionNum = 0;
+  let fakeQuestionNum = 0; // 大标题不是问题，所以
 
   let jsonStr = JSON.parse(fs.readFileSync('./db/answers/'+code+'_xiList.json','utf8'));
   jsonStr = jsonStr.answers
   // console.log('jsonStr----:',jsonStr);
   // let jsonStr = ''
-
+  let keynum = 0
   for (let i = 0; i < questions.length; i++) {
     let questionEle = questions[i];
     let content = await questionEle.findElement(By.css('.qtext p'))
@@ -175,11 +177,11 @@ async function handleMaoGaiQuiz( driver, url, id ,num,isFirstPage,options,code){
     let question = await content.getText()
     console.log('question---:',question);
     if(keyWords1.indexOf(question[0]) != -1){
-      fakeQuestionNum++;
-      level_1+=keyWords1.indexOf(question[0]);
+      keynum = 0; // 每一道题的下标
+      level_1=keyWords1.indexOf(question[0]);
       continue;
     }
-    let key = jsonStr[num][level_1][i-fakeQuestionNum]
+    let key = jsonStr[num][level_1][keynum]
     console.log('key---:',key);
     for( let j = 0; j< answerInputs.length; j++){
       let answer = answerInputs[j];
@@ -200,8 +202,9 @@ async function handleMaoGaiQuiz( driver, url, id ,num,isFirstPage,options,code){
           console.log('chose '+b);
         }
       }
-
     }
+    keynum++;
+
   }
   console.log('nextPage----:',nextPage);
   console.log('submitPage----:',submitPage);

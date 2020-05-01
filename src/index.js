@@ -374,19 +374,42 @@ function isCouseJsonExists(username, courseTitle) {
 }
 
 
-async function handleLearnFinal(courseCode, username, password) {
-  if( !username || !password){
-    throw  new Error( "用户名和密码是必须的")
-  }
-
+async function handleLearnFinal(accounts, courseTitle ) {
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver)
-  console.log(" bot doing profile a course")
-    // 1934001474084
-    // 19930902
-  await bot.login(username, password)
-  await bot.prepareForLearn(courseCode)
-  await bot.learnFinal(courseCode)
+
+  let results = []
+
+    for (let i = 0; i < accounts.length; i++) {
+      let account = accounts[i]
+      let username = account.username
+      let password = account.password
+      //let subject = account.subject
+      let success = false
+      let filename = `./db/subjects/${courseTitle}.json`
+      let log = await bot.getLog( courseTitle, { filename })
+      if( log ){
+        console.debug("bot.learnModule ", username);
+        await bot.login(username, password)
+        let course = await bot.prepareForLearn(courseTitle)
+        if( course ){
+          console.log(" bot doing profile a course")
+          // 1934001474084
+          // 19930902
+          await bot.learnFinal()
+        }else{
+          console.error("没有找到课程", username, courseTitle)
+        }
+        await bot.closeOtherTabs( )
+
+        await bot.logout()
+      }else{
+        console.error("没有找到课程数据文件："+ courseCode )
+      }
+    }
+
+
+  await driver.quit()
 }
 
 

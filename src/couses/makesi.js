@@ -72,6 +72,8 @@ async function parseCouseMaKeSi(driver) {
           type = 'quiz'
         }else if( src.includes('page_h.png')){
           type = 'page'
+        }else if( src.includes('assign_h.png')){
+          type = 'assign'
         }
       }
       if (imgs.length >= 2) {

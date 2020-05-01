@@ -156,9 +156,10 @@ async function handleZhiNanQuiz( driver, url, id ,num,isFirstPage,options,code){
 
     let question = await content.getText()
     console.log('question---:',question);
-    if(keyWords1.indexOf(question[0]) != -1){
+    if(keyWords1.indexOf(question[0]) != -1 ){
       keynum = 0;
-      level_1+=keyWords1.indexOf(question[0]);
+      level_1=keyWords1.indexOf(question[0]);
+      console.log('question--- level_1 ++:',level_1 );
       continue;
     }
     console.log('jsonStr['+num+']['+level_1+']---:',jsonStr[num][level_1]);
