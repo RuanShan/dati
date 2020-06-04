@@ -910,13 +910,21 @@ class Bot {
 function getCourseNameByCode(code) {
   // liaoning
   if (code == '4372') return '4372_毛泽东思想和中国特色社会主义理论体系概论'
+  if (code == '4487') return '4487_毛泽东思想和中国特色社会主义理论体系概论'
+  if (code == '4485') return '4485_毛泽东思想和中国特色社会主义理论体系概论'
   if (code == '3935') return '3935_马克思主义基本原理概论'
+  if (code == '4609') return '4609_马克思主义基本原理概论'
   if (code == '3945') return '3945_习近平新时代中国特色社会主义思想'
   if (code == '4065') return '4065_习近平新时代中国特色社会主义思想'
+  if (code == '4611') return '4611_习近平新时代中国特色社会主义思想'
+  if (code == '4488') return '4488_习近平新时代中国特色社会主义思想'
   if (code == '3937') return '3937_思想道德修养与法律基础'
   if (code == '4374') return '4374_思想道德修养与法律基础'
+  if (code == '4491') return '4491_思想道德修养与法律基础'
+  if (code == '4614') return '4614_思想道德修养与法律基础'
   if (code == '3944') return '3944_中国近现代史纲要'
   if (code == '4373') return '4373_中国近现代史纲要'
+  if (code == '4615') return '4615_中国近现代史纲要'
   if (code == '4387') return '4387_中国特色社会主义理论体系概论'
   // heilongjiang
   if (code == '4498') return '4498_中国特色社会主义理论体系概论'

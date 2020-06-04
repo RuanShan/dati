@@ -98,8 +98,28 @@ async function parseCouseBase(driver) {
   return couseJson
 }
 
+async function handleAtempt( driver, url){
+  let title = await driver.getTitle();
+
+  if( title.startsWith( '503 Service')){
+    console.error("503 延时5秒开始, 防止出现503, 服务器响应问题" )
+    await  driver.wait( function(){
+      return new Promise((resolve, reject) => {
+        console.error("503 延时5秒" )
+        setTimeout(()=>{ resolve(true)}, 5000);
+      })
+    });
+    console.log('handle 503 get url again');
+    let navigation = driver.navigate();
+    await navigation.to(url) 
+    console.log('handle 503 get url again', url);
+    
+  }
+  return true
+}
+
 async function handleQuizBase( driver, url, id ,num,isFirstPage,options,code){
-  console.log('====================handleMaoQuiz================');
+  console.log('====================handleBaseQuiz================');
   let xpath = "//div[@class='singlebutton quizstartbuttondiv']//button"
   //let queXpath = "//div[@class='que truefalse deferredfeedback notyetanswered']"
   let queSelector = ".que"
@@ -113,17 +133,23 @@ async function handleQuizBase( driver, url, id ,num,isFirstPage,options,code){
     console.log('==============isFirstPage==============');
     console.log('url-----:',url);
     await driver.get(url)
+    // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
+    await handleAtempt( driver, url );
+
     await driver.wait(until.elementLocated(By.xpath(xpath)), 15000);
     let button = await driver.findElement(By.xpath(xpath))
-    console.error("isFirstPage 延时1秒开始, 防止出现503, 服务器响应问题" )
     let date = new Date()
     await  driver.wait( function(){
       return new Promise((resolve, reject) => {
-        console.error("isFirstPage 延时1秒" )
+        console.error("isFirstPage 延时3秒" )
         setTimeout(()=>{ resolve(true)}, 2000);
       })
     });
-    console.error("isFirstPage 延时1秒结束", (new Date()).getTime() - date.getTime()  )
+    console.error("isFirstPage 延时3秒结束", (new Date()).getTime() - date.getTime()  )
+
+    await handleAtempt( driver, url );
+    console.error("再次检查" )
+
     await button.click() // 进入测试页面
   }
 

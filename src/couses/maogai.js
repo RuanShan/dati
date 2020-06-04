@@ -137,17 +137,24 @@ async function handleMaoGaiQuiz( driver, url, id ,num,isFirstPage,options,code){
   if(isFirstPage){
     console.log('==============isFirstPage==============');
     await driver.get(url)
+    // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
+    let title = await driver.getTitle()
+    if( title.startsWith( '503')){
+      await driver.get(url)
+    }
+    console.log('title-----:',title);
+
     await driver.wait(until.elementLocated(By.xpath(xpath)), 15000);
     let button = await driver.findElement(By.xpath(xpath))
-    console.error("isFirstPage 延时1秒开始, 防止出现503, 服务器响应问题" )
+    console.error("isFirstPage 延时3秒开始, 防止出现503, 服务器响应问题" )
     let date = new Date()
     await  driver.wait( function(){
       return new Promise((resolve, reject) => {
-        console.error("isFirstPage 延时1秒" )
-        setTimeout(()=>{ resolve(true)}, 2000);
+        console.error("isFirstPage 延时3秒" )
+        setTimeout(()=>{ resolve(true)}, 3000);
       })
     });
-    console.error("isFirstPage 延时1秒结束", (new Date()).getTime() - date.getTime()  )
+    console.error("isFirstPage 延时3秒结束", (new Date()).getTime() - date.getTime()  )
     await button.click() // 进入测试页面
   }
 
