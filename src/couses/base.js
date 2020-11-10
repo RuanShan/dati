@@ -7,6 +7,7 @@ const {
   until
 } = require('selenium-webdriver');
 const fs = require('fs');
+const {handle503, handleDelay} = require ('../util');
 
 async function parseCouseBase(driver) {
 
@@ -98,25 +99,33 @@ async function parseCouseBase(driver) {
   return couseJson
 }
 
-async function handleAtempt( driver, url){
-  let title = await driver.getTitle();
+// async function handle503( driver, url, delay){
+//   let title = await driver.getTitle();
+//   delay = delay || 10000
+//   let isOK = true
+//   if( title.startsWith( '503 Service')){
+//     console.error("503 延时5秒开始, 防止出现503, 服务器响应问题" )
+//     await  driver.wait( function(){
+//       return new Promise((resolve, reject) => {
+//         console.error("503 延时5秒" )
+//         setTimeout(()=>{ resolve(true)}, delay);
+//       })
+//     });
+//     console.log('handle 503 get url again');
+//     let navigation = driver.navigate();
+//     // 
+//     if( url ){
+//       await navigation.to(url) 
 
-  if( title.startsWith( '503 Service')){
-    console.error("503 延时5秒开始, 防止出现503, 服务器响应问题" )
-    await  driver.wait( function(){
-      return new Promise((resolve, reject) => {
-        console.error("503 延时5秒" )
-        setTimeout(()=>{ resolve(true)}, 5000);
-      })
-    });
-    console.log('handle 503 get url again');
-    let navigation = driver.navigate();
-    await navigation.to(url) 
-    console.log('handle 503 get url again', url);
-    
-  }
-  return true
-}
+//     }else{
+//       // post request, 没有url， 只能重新reload
+//       await navigation.refresh() 
+//     }
+//     console.log('handle 503 get url again', url);
+//     isOK = false
+//   }
+//   return isOK
+// }
 
 async function handleQuizBase( driver, url, id ,num,isFirstPage,options,code){
   console.log('====================handleBaseQuiz================');
@@ -134,7 +143,12 @@ async function handleQuizBase( driver, url, id ,num,isFirstPage,options,code){
     console.log('url-----:',url);
     await driver.get(url)
     // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
-    await handleAtempt( driver, url );
+    for( i=1; i<5; i++){
+      let ok = await handle503( driver, url, 5000*i );
+      if(ok){
+        break;
+      }
+    }
 
     await driver.wait(until.elementLocated(By.xpath(xpath)), 15000);
     let button = await driver.findElement(By.xpath(xpath))
@@ -142,22 +156,17 @@ async function handleQuizBase( driver, url, id ,num,isFirstPage,options,code){
     await  driver.wait( function(){
       return new Promise((resolve, reject) => {
         console.error("isFirstPage 延时3秒" )
-        setTimeout(()=>{ resolve(true)}, 2000);
+        setTimeout(()=>{ resolve(true)}, 1500);
       })
     });
     console.error("isFirstPage 延时3秒结束", (new Date()).getTime() - date.getTime()  )
 
-    await handleAtempt( driver, url );
-    console.error("再次检查" )
-
     await button.click() // 进入测试页面
+    
   }
 
   await driver.wait(until.elementLocated(By.css(queSelector)), 15000);
-  // 可能不存在
-  const [err1, nextPage] = await awaitWrap(driver.findElement(By.xpath(nextPageXpath)))
-  const [err2, prevPage] = await awaitWrap(driver.findElement(By.xpath(prevPageXpath)))
-  const [err3, submitPage] = await awaitWrap(driver.findElement(By.xpath(submitPageXpath)))
+
 
   let questions = await driver.findElements(By.css(queSelector))
   console.debug( `questions:${questions.length}`)
@@ -221,12 +230,25 @@ async function handleQuizBase( driver, url, id ,num,isFirstPage,options,code){
     }
     keynum++;
   }
+
+  // 可能不存在
+  const [err1, nextPage] = await awaitWrap(  driver.findElement(By.xpath(nextPageXpath)))
+  const [err2, prevPage] = await awaitWrap(  driver.findElement(By.xpath(prevPageXpath)))
+  const [err3, submitPage] = await awaitWrap(  driver.findElement(By.xpath(submitPageXpath)))
   console.log('nextPage----:',nextPage);
   console.log('submitPage----:',submitPage);
 
   if(nextPage){
     console.log('=======has nextPage=======');
     await nextPage.click()
+
+    // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
+    for( i=1; i<5; i++){
+      let ok = await handle503( driver, null, 5000*i );
+      if(ok){
+        break;
+      }
+    }
     return await handleQuizBase( driver, url, id ,num,false,options,code)
   }else if(submitPage){
     console.log('=======has submitPage=======');
@@ -234,6 +256,13 @@ async function handleQuizBase( driver, url, id ,num,isFirstPage,options,code){
   }
 
   if(options.submitquiz == 'yes'){
+    // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
+    for( i=1; i<5; i++){
+      let ok = await handle503( driver, null, 5000*i );
+      if(ok){
+        break;
+      }
+    }
     const submitButton = await driver.findElements(By.css('.submitbtns button.btn-secondary'))
     console.log('submitButton-----:',submitButton);
     await submitButton[1].click()
@@ -241,8 +270,11 @@ async function handleQuizBase( driver, url, id ,num,isFirstPage,options,code){
     await driver.wait(until.elementLocated(By.css('.confirmation-dialogue input.btn-primary')), 15000);
     const ensureButton = await driver.findElements(By.css('.confirmation-dialogue input.btn-primary'))
     console.log('ensureButton-----:',ensureButton);
-    // 提交后等 300ms，以免直接切换页面，请求没有发到服务器端？
+
     await ensureButton[0].click()
+
+    // 提交后等 300ms，以免直接切换页面，请求没有发到服务器端？
+    await  handleDelay( driver, 300);
   }
 }
 

@@ -1,9 +1,12 @@
 const program = require('commander')
 const fs = require('fs')
 const csv = require('csv');
+const stringify = require('csv-stringify')
 
 const csvParseSync = require('csv-parse/lib/sync')
-const csvGenerateSync = require('csv-generate/lib/sync')
+const {
+  getCourseNameByCode
+} = require('./src/util.js');
 
 const enableVideoApi = true
 const {
@@ -18,7 +21,9 @@ const {
   handleLearnModuleOfAccounts2,
   handleReadScore,
   getAccountsCourseCode,
-  handleLearnFinal
+  handleLearnFinal,
+  handleGenSubject,
+  handleGenAccounts
 } = require('./src/index')
 
 // example: node app.js -- createlog 4255 #毛泽东思想和中国特色社会主义理论体
@@ -31,6 +36,7 @@ program
   .option('-a, --account <accountfile>', 'account file')
   .option('-m, --modulefile <modulefile>', 'module file')
   .option('-s, --submitquiz <yes|no>', 'submit quiz  yes or no')
+  .option('-f, --submitfinal <yes|no>', 'submit final  yes or no')
   .option('-t, --type <type>', 'module type') // 学习的类型
 
 program.command('createlog <course>')
@@ -59,8 +65,8 @@ program.command('createModuleFile <course>')
     // 保存文件
     let saveFilename = `./db/subjects/${course}_${type}_module.json`
     fs.writeFileSync(saveFilename, JSON.stringify(moduleids))
-    //fs.writeFileSync(filename, csvGenerateSync(sumaries ))
 
+    
   })
 
 program.command('lcourse <course>')
@@ -128,6 +134,7 @@ program.command('initdb [accountfile]')
   })
 
 // 检查所有账户是否可以登录
+// node app.js checkin account.json
 program.command('checkin [accountfile]')
   .description('checkin all accounts, support json, csv')
   .action(async function(accountfile) {
@@ -141,6 +148,7 @@ program.command('checkin [accountfile]')
   })
 
 //  根据账号，课程名称，取得科目代码
+// node app.js getcode account.json
 program.command('getcode [accountfile]')
   .description('checkin all accounts, support json, csv')
   .action(async function(accountfile) {
@@ -163,13 +171,21 @@ program.command('summary [accountfile]')
     // 取得所有账户信息，取得每个账户的课程进度
     let accounts = await getAccounts(accountfile)
     console.log("get all course summary", accountfile, accounts.length)
+    if( accounts.length> 0 ){
 
-    let sumaries = await handleGetCourseSumaries(accounts, cids)
+      let sumaries = await handleGetCourseSumaries(accounts )
 
-    // 保存文件
-    let filename = './db/summary.csv'
-    //fs.writeFileSync(filename, JSON.stringify(sumaries))
-    fs.writeFileSync(filename, csvGenerateSync(sumaries))
+      // 保存文件
+      let filename = `./db/summary-${(new Date).getTime()}.csv`
+
+      console.log( "before save to file:", filename  )
+      //fs.writeFileSync(filename, JSON.stringify(sumaries))
+      const csv = stringify(sumaries, {}, function(err, records){
+        fs.writeFileSync(filename, records)
+        console.log( "after save to file:", filename )
+      })
+    }
+
 
   })
 
@@ -269,9 +285,9 @@ program.command('lfinal')
       console.log("软件出现问题，请联系开发人员！")
       return
     }
-    console.log('accountfile----:'.accountfile);
+    console.log('accountfile----:'+ accountfile);
     let accounts = []
-    if (program.account) {
+    if (program.account || program.username) {
       accounts = await getAccounts(program.account)
     }
 
@@ -280,9 +296,47 @@ program.command('lfinal')
       courseTitle = getCourseNameByCode(course)
     }
 
-    await  handleLearnFinal(accounts, courseTitle )
+    let options = {
+      submitfinal: program.submitfinal,
+    }
+    await  handleLearnFinal(accounts, courseTitle, options )
 
   })
+
+// 生成课程数据文件
+program.command('gensubject')
+  .description('生成课程数据文件')
+  .action(async function(accountfile) {
+    if (!isAvaible()) {
+      console.log("软件出现问题，请联系开发人员！")
+      return
+    }
+    let accounts = []
+    if (program.account || program.username) {
+      accounts = await getAccounts(program.account)
+    }
+
+    // { username: '', password: '', subject: ''}
+    await  handleGenSubject(accounts  )
+})
+
+// 生成课程数据文件，把一个账户文件按照科目分别生成对应的账号文件，存入db/accounts/xxxx.csv
+// genaccount --account=account.csv 
+program.command('genaccount')
+  .description('生成账号数据文件')
+  .action(async function( ) {
+    if (!isAvaible()) {
+      console.log("软件出现问题，请联系开发人员！")
+      return
+    }
+    let accounts = []
+    if (program.account || program.username) {
+      accounts = await getAccounts(program.account)
+    }
+
+    // { username: '', password: '', subject: '', code: ''}
+    await  handleGenAccounts(accounts  )
+})
 
 program.parse(process.argv)
 
@@ -329,13 +383,8 @@ async function getModuleIds(course) {
 async function getAccountsJsonByKey(filename) {
   console.log('==============getAccountsJsonByKey==============');
   console.log('filename---:', filename);
-  console.log('program---:', program);
-  // 检查当前时间 2020-01-01
 
   let accounts = []
-  // if( isNetwork ){
-  //
-  // }
 
   if (program.username) {
     accounts.push({
@@ -387,7 +436,7 @@ async function getAccountsCsvByKey(filename) {
 
 // 软件是否可用
 function isAvaible() {
-  let availabe = new Date('2020-07-05')
+  let availabe = new Date('2020-12-30')
   let now = new Date()
 
   if (now < availabe) {
@@ -397,30 +446,3 @@ function isAvaible() {
   }
 }
 
-
-function getCourseNameByCode(code) {
-  // liaoning
-  if (code == '4372') return '4372_毛泽东思想和中国特色社会主义理论体系概论'
-  if (code == '4487') return '4487_毛泽东思想和中国特色社会主义理论体系概论'
-  if (code == '4485') return '4485_毛泽东思想和中国特色社会主义理论体系概论'
-  if (code == '3935') return '3935_马克思主义基本原理概论'
-  if (code == '4609') return '4609_马克思主义基本原理概论'
-  if (code == '3945') return '3945_习近平新时代中国特色社会主义思想'
-  if (code == '4065') return '4065_习近平新时代中国特色社会主义思想'
-  if (code == '4488') return '4488_习近平新时代中国特色社会主义思想'
-  if (code == '4611') return '4611_习近平新时代中国特色社会主义思想'
-  if (code == '3937') return '3937_思想道德修养与法律基础'
-  if (code == '4374') return '4374_思想道德修养与法律基础'
-  if (code == '4614') return '4614_思想道德修养与法律基础'
-  if (code == '4491') return '4491_思想道德修养与法律基础'
-  if (code == '3944') return '3944_中国近现代史纲要'
-  if (code == '4373') return '4373_中国近现代史纲要'
-  if (code == '4615') return '4615_中国近现代史纲要'
-  if (code == '4387') return '4387_中国特色社会主义理论体系概论'
-  if (code == '4628') return '4628_国家开放大学学习指南'
-  // heilongjiang
-  if (code == '4498') return '4498_中国特色社会主义理论体系概论'
-
-  return null
-
-}

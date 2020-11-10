@@ -6,7 +6,8 @@ const {
   Key,
   until
 } = require('selenium-webdriver');
-const {answers} = require ('../../db/answers/zhinanList.json');
+const {answers} = require ('../../db/answers/4628_zhinanList.json');
+const {handle503} = require ('../util');
 async function parseCouseZhiNan(driver) {
 
   let progressPath = "//div[@class='progress-bar']/span"
@@ -117,6 +118,15 @@ async function handleZhiNanQuiz( driver, url, id ,num,isFirstPage,options,code){
     console.log('==============isFirstPage==============');
     console.log('url-----:',url);
     await driver.get(url)
+
+    // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
+    for( i=1; i<5; i++){
+      let ok = await handle503( driver, url, 5000*i );
+      if(ok){
+        break;
+      }
+    }
+
     await driver.wait(until.elementLocated(By.xpath(xpath)), 15000);
     let button = await driver.findElement(By.xpath(xpath))
     console.error("isFirstPage 延时1秒开始, 防止出现503, 服务器响应问题" )
@@ -182,6 +192,7 @@ async function handleZhiNanQuiz( driver, url, id ,num,isFirstPage,options,code){
       }else{//xuan ze ti
         let answerStr = key.answer.replace(/\s*/g,"").replace(".","").substring(1);
         let labelStr = b.replace(/\s*/g,"").replace(".","").substring(1)
+        console.log('answerStr '+answerStr + ' labelStr '+ labelStr);
         if(answerStr.indexOf(labelStr)!=-1||answerStr=='全部'){
           console.log('chose '+b);
           console.log('type--:',await answer.getAttribute('type'));
@@ -203,6 +214,15 @@ async function handleZhiNanQuiz( driver, url, id ,num,isFirstPage,options,code){
   if(nextPage){
     console.log('=======has nextPage=======');
     await nextPage.click()
+
+    // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
+    for( i=1; i<5; i++){
+      let ok = await handle503( driver, null, 5000*i );
+      if(ok){
+        break;
+      }
+    }
+
     return await handleZhiNanQuiz( driver, url, id ,num,false,options,code)
   }else if(submitPage){
     console.log('=======has submitPage=======');
@@ -210,6 +230,14 @@ async function handleZhiNanQuiz( driver, url, id ,num,isFirstPage,options,code){
   }
 
   if(options.submitquiz == 'yes'){
+    // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
+    for( i=1; i<5; i++){
+      let ok = await handle503( driver, null, 5000*i );
+      if(ok){
+        break;
+      }
+    }
+
     const submitButton = await driver.findElements(By.css('.submitbtns button.btn-secondary'))
     console.log('submitButton-----:',submitButton);
     await submitButton[1].click()

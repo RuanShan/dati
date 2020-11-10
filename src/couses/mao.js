@@ -97,6 +97,27 @@ async function parseCouseMao(driver) {
   return couseJson
 }
 
+async function handleAtempt( driver, url){
+  let title = await driver.getTitle();
+
+  if( title.startsWith( '503 Service')){
+    console.error("503 延时5秒开始, 防止出现503, 服务器响应问题" )
+    await  driver.wait( function(){
+      return new Promise((resolve, reject) => {
+        console.error("503 延时6秒" )
+        setTimeout(()=>{ resolve(true)}, 6000);
+      })
+    });
+    console.log('handle 503 get url again');
+    let navigation = driver.navigate();
+    await navigation.to(url) 
+    console.log('handle 503 get url again', url);
+    
+  }
+  return true
+}
+
+
 async function handleMaoQuiz( driver, url, id ,num,isFirstPage){
   console.log('====================handleMaoQuiz================');
   let xpath = "//div[@class='singlebutton quizstartbuttondiv']//button"
@@ -113,11 +134,7 @@ async function handleMaoQuiz( driver, url, id ,num,isFirstPage){
     console.log('url-----:',url);
     await driver.get(url)
     // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
-    let title = await driver.getTitle()
-    if( title.startsWith( '503')){
-      await driver.get(url)
-    }
-    console.log('title-----:',title);
+    await handleAtempt( driver, url );
 
     await driver.wait(until.elementLocated(By.xpath(xpath)), 15000);
     let button = await driver.findElement(By.xpath(xpath))
@@ -130,6 +147,10 @@ async function handleMaoQuiz( driver, url, id ,num,isFirstPage){
       })
     });
     console.error("isFirstPage 延时2秒结束", (new Date()).getTime() - date.getTime()  )
+
+    await handleAtempt( driver, url );
+    console.error("再次检查" )
+    
     button.click() // 进入测试页面
   }
 

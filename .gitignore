@@ -20,3 +20,5 @@ dist.zip
 account*
 account.json
 *.csv
+*.bat
+account.json

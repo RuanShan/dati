@@ -1,5 +1,7 @@
 // import util from './src/util.js'
 const fs = require('fs');
+const path = require('path');
+const stringify = require('csv-stringify')
 
 const {
   scrollToBottom,
@@ -60,7 +62,7 @@ async function getAccountsCourseCode(  accounts=[] ) {
     let { username, password, subject } = account
     if( username && username.length>0 && password && password.length>0){
       let success = await bot.login(username, password)
-      let courseCode = { username, password, checkin: success, subject }
+      let courseCode = Object.assign({ username, password, checkin: success, subject }, account)
       if( success){
         let course = await bot.prepareForLearn(subject)
         if( course){
@@ -141,6 +143,7 @@ async function handleCreateLog(courseCode, username, password ) {
   await bot.profileCouse(courseCode)
   await bot.createAnswerList(courseCode)
   // await driver.quit()
+  return bot
 }
 
 async function handleReadScore(courseCode, username, password){
@@ -160,16 +163,17 @@ async function handleGetCourseSumaries(accounts, courseCodes ){
   let bot = new Bot(driver)
   console.log(" bot doing handleSumaryCourses")
 
-  let allsumaries
+  let sumaries= []
   for (let i = 0; i < accounts.length; i++) {
     let account = accounts[i]
-    let user = account.username
+    let username = account.username
     let password = account.password
+    let subject = account.subject
 
     await bot.login(username, password)
-    let summary = await bot.getSummary(courseCodes)
+    let summary = await bot.getSummary([subject])
 
-    sumaries.concat( summary)
+    sumaries = sumaries.concat( summary)
     await bot.logout()
 
   }
@@ -374,7 +378,7 @@ function isCouseJsonExists(username, courseTitle) {
 }
 
 
-async function handleLearnFinal(accounts, courseTitle ) {
+async function handleLearnFinal(accounts, courseTitle, options ) {
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver)
 
@@ -396,7 +400,7 @@ async function handleLearnFinal(accounts, courseTitle ) {
           console.log(" bot doing profile a course")
           // 1934001474084
           // 19930902
-          await bot.learnFinal()
+          await bot.learnFinal(options)
         }else{
           console.error("没有找到课程", username, courseTitle)
         }
@@ -413,6 +417,102 @@ async function handleLearnFinal(accounts, courseTitle ) {
 }
 
 
+
+// 生成账号对应的课程数据文件
+async function handleGenSubject( accounts ){
+  // 根据账号生成 数据文件
+  for (let i = 0; i < accounts.length; i++) {
+    let account = accounts[i]
+    let username = account.username
+    let password = account.password
+    let course = account.subject // 课程名称
+
+    let bot = await handleCreateLog(course, username, password)
+
+    // 1. ./db/students/2021201400283_习近平新时代中国特色社会主义思想.json
+    let studentfile = await bot.getCouseJsonPath( bot.couseTitle )
+    // 重命名
+    let couse = bot.getCourseInfo( bot.couseTitle )
+    // 课程代码在前，内部使用，作为课程文件命名
+    let couseFullname = `${couse.code}_${couse.title}`
+    let moduleType = 'video'
+    let dbfile = `./db/subjects/${couseFullname}.json`
+    console.log( studentfile, dbfile )
+    fs.copyFileSync( studentfile, dbfile )
+    // 2. 创建视频数据文件
+    createModuleFile( couseFullname, moduleType )
+
+    // 3. 创建可执行文件, 文件的最后4个字符为课程号，
+    let couseFullname2 = `${couse.title}_${couse.code}`
+
+    createBinFile(couseFullname2)
+  }
+}
+
+async function handleGenAccounts( accounts ){
+  console.log( "handleGenAccounts= accounts", accounts.length )
+  let codeAccountsMap = { }
+  for (let i = 0; i < accounts.length; i++) {
+    let account = accounts[i]
+    let username = account.username
+    let password = account.password
+    let course = account.subject // 课程名称
+    let code = account.code
+    if( code ){
+      codeAccountsMap[code] = codeAccountsMap[code]||[]
+      codeAccountsMap[code].push( account )
+    }
+  }
+
+  Object.keys( codeAccountsMap ).forEach( ( code )=>{
+    let filename = `./db/accounts/${code}.csv`
+
+    let accountByCode = codeAccountsMap[code]
+    // 保存文件
+    const csv = stringify(accountByCode, {  header: true,
+        columns: ['username','password','subject', 'code']
+      }, function(err, records){
+      fs.writeFileSync(filename, records)
+      console.log( "after save to file:", filename, accountByCode.length )
+    })
+  })
+}
+
+// couseFullname: 4065_习近平新时代中国特色社会主义思想
+// moduleType: video, text
+function createModuleFile( couseFullname, moduleType ){
+  // 4065_习近平新时代中国特色社会主义思想
+  let filename = './db/subjects/' + couseFullname + '.json'
+  let data = fs.readFileSync(filename, "utf-8")
+  let res = JSON.parse(data);
+  let moduleids = []
+  res.forEach((r) => {
+    if (moduleType == r.type) {
+      moduleids.push(r.id)
+    }
+  })
+
+  // 保存文件
+  let saveFilename = `./db/subjects/${couseFullname}_${moduleType}_module.json`
+  fs.writeFileSync(saveFilename, JSON.stringify(moduleids))
+}
+
+// couseFullname 4065_习近平新时代中国特色社会主义思想
+function createBinFile(couseFullname){
+  let templateDir = `./db/templates`
+  let destDir =  `./bin/${couseFullname}`
+  if( !fs.existsSync( destDir )){
+    fs.mkdirSync( destDir )
+  }
+  let files = fs.readdirSync(templateDir)
+  files.forEach((filename)=>{
+    fs.copyFileSync( templateDir + '/'+filename, destDir +'/'+filename )
+  })
+
+}
+
+
+
 module.exports = {
   handleAccountsCheckin,
   handleCreateDb,
@@ -425,5 +525,7 @@ module.exports = {
   handleLearnModuleOfAccounts2,
   handleReadScore,
   getAccountsCourseCode,
-  handleLearnFinal
+  handleLearnFinal,
+  handleGenSubject,
+  handleGenAccounts
 }

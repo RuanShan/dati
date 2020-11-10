@@ -5,6 +5,7 @@ const {
   until
 } = require('selenium-webdriver');
 const {
+  getCourseNameByCode,
   scrollToBottom,
   playVideo
 } = require('./util')
@@ -42,6 +43,7 @@ const {
 // const { getVerifyCode }  = require('./ocr')
 // 每个学生来自不同地方，可能url不同
 const CouseUrlMap = {
+  // { title, code, url, host }
   // '4125': 'http://anhui.ouchn.cn/course/view.php?id=4125', // 国家开放大学学习指南
   // '4257': 'http://anhui.ouchn.cn/course/view.php?id=4257', // 思想道德修养与法律基础
   // '3833': 'http://anhui.ouchn.cn/course/view.php?id=3833', // 习近平新时代中国特色社会主义思想
@@ -208,6 +210,7 @@ class Bot {
     let driver = this.driver
 
     await driver.get('http://passport.ouchn.cn/Account/Login?ReturnUrl=%2Fconnect%2Fauthorize%2Fcallback%3Fclient_id%3Dstudentspace%26redirect_uri%3Dhttp%253A%252F%252Fstudent.ouchn.cn%252F%2523%252Fsignin-oidc%2523%26response_type%3Did_token%2520token%26scope%3Dopenid%2520profile%2520ouchnuser%2520ouchnstudentspaceapi%26state%3Df2b1c4eebd354996ab8f0c3b618f39d1%26nonce%3D044e6125331b4db298c6acf33b1058dd');
+    //await driver.get('http://passport.ouchn.cn/Account/Login?ReturnUrl=%2F');
     await driver.findElement(By.id('username')).sendKeys(username);
     await driver.findElement(By.id('password')).sendKeys(password);
     //await handleVerifyCode(driver)
@@ -216,8 +219,17 @@ class Bot {
     let success = false
     //最多等待15秒
     try {
-      await driver.wait(until.titleContains('学生空间'), 20000);
-      await driver.get('http://student.ouchn.cn/#home')
+      await driver.wait(until.titleContains('学生空间'), 10000).
+      then(async ()=>{
+        await driver.wait(until.titleContains('学生空间'), 10000);
+        await driver.get('http://student.ouchn.cn/')
+      }).catch(async ()=>{
+      // 偶尔可能没有反应，直接进入学生主页，等待10秒
+        await driver.get('http://student.ouchn.cn/')
+        await driver.wait(until.titleContains('学生空间'), 10000);
+
+      })
+
       logger.info('登录成功!!');
       // 用于打开其它窗口后，再回来打开其它课程
       this.mainHandle = await driver.getWindowHandle()
@@ -457,7 +469,7 @@ class Bot {
 
   }
 
-  async goFinal(lesson) {
+  async goFinal(lesson, options) {
     console.log('=================goFinal=================');
     let driver = this.driver
 
@@ -471,6 +483,7 @@ class Bot {
     await driver.wait(until.elementLocated(By.css('.singlebutton button.btn-secondary')), 15000);
     const commitButton = await driver.findElement(By.css('.singlebutton button.btn-secondary'))
     await commitButton.click()
+    console.debug("编辑按钮")
 
     await driver.wait(until.elementLocated(By.css('iframe')), 15000);
     const textBody = await driver.findElement(By.css('iframe'))
@@ -481,6 +494,22 @@ class Bot {
     await driver.wait(until.elementLocated(By.css('.form-group input.btn-primary')), 15000);
     const saveButton = await driver.findElement(By.css('.form-group input.btn-primary'))
     await saveButton.click()
+
+    // 点击提交按钮
+    if( options.submitfinal == 'yes'){
+      let submitButtonCss = '.submissionaction:last-child form button.btn-secondary'
+      await driver.wait(until.elementLocated(By.css(submitButtonCss)), 15000);
+      console.debug("查找提交按钮")
+      const submitButton = await driver.findElement(By.css(submitButtonCss))
+      await submitButton.click()
+      console.debug("点击提交按钮")
+      let confirmButtonCss = '.submitconfirm #id_submitbutton'
+      await driver.wait(until.elementLocated(By.css(confirmButtonCss)), 15000);
+      const confirmButton = await driver.findElement(By.css(confirmButtonCss))
+      await confirmButton.click()
+      console.debug("点击确认按钮")
+    }
+
   }
 
   // 通过api去看视频
@@ -507,6 +536,12 @@ class Bot {
         let video = await driver.wait(until.elementLocated(By.tagName('video')), 15000);
         let script = `$.ajaxSetup({ async : false}); var res = null; $.getJSON('/theme/blueonionre/modulesCompletion.php?cmid=${id}&id=${classId}&sectionid=${sectionId}', function(data){ res = data; }); return res;`
         let res = await driver.executeScript(script);
+        await  driver.wait( function(){
+          return new Promise((resolve, reject) => {
+            console.error("视频播放延时1秒, 防止API没有成功！" )
+            setTimeout(()=>{ resolve(true)}, 1000);
+          })
+        });
         console.log('视频播放成功', typeof(res), res);
       } catch (ex) {
         success = false
@@ -545,7 +580,7 @@ class Bot {
         return a.isDisplayed().then(function(isDisplayed) {
           return isDisplayed === true;
         });
-      }, 1500);
+      }, 5000);
       if (displayed) {
         await a.click()
         // 打开课程窗口
@@ -564,7 +599,7 @@ class Bot {
     await driver.wait(async () => {
       let handles = await driver.getAllWindowHandles()
       return handles.length == links.length + 1
-    }, 50000, `错误：${links.length}课程窗口没有打开`)
+    }, 80000, `错误：${links.length}课程窗口没有打开`)
 
     console.log('all tab opened2, links');
     let handles = await driver.getAllWindowHandles()
@@ -613,29 +648,9 @@ class Bot {
     return CouseUrlMap[couseTitle]
   }
 
-  async learnFinal(courseCode) {
+  async learnFinal(options) {
 
-    // this.couseTitle = courseCode || this.couseTitle
-    // console.debug("profileCouse=", courseCode, CouseUrlMap);
-    // let couse = null
-    // if (courseCode) {
-    //   couse = CouseUrlMap[courseCode]
-    //
-    // } else {
-    //   couse = CouseUrlMap[this.couseTitle]
-    // }
-
-    // if (couse) {
-    //   let {
-    //     url,
-    //     title,
-    //     code
-    //   } = couse
-    //
-    //   if (title == '毛泽东思想和中国特色社会主义理论体系概论') {
-    //     this.courseInfo = await parseCouseMaoGai(this.driver)
-    //   }
-    // }
+     
 
     let driver = this.driver
     let moduleStatus = this.courseInfo.status
@@ -644,7 +659,7 @@ class Bot {
       let lesson = moduleStatus[i];
 
       if (lesson.title == '终结性考试' && lesson.type =='assign') {
-        await this.goFinal(lesson)
+        await this.goFinal(lesson, options)
       }
     }
   }
@@ -713,7 +728,7 @@ class Bot {
       // let endAt = new Date()
       // this.courseInfo.score.startAt = startAt
       // this.courseInfo.score.endAt = endAt
-      this.saveCouseJson(this.couseTitle)
+      await this.saveCouseJson(this.couseTitle)
     } else {
       console.debug(`课程代码 ${ this.couseTitle} ${courseCodeOrTitle} 找不到课程url`);
     }
@@ -749,10 +764,7 @@ class Bot {
     let filename = await this.getCouseJsonPath(classId)
     //console.log('this.courseInfo----:',this.courseInfo);
     // 保存 课程信息时只保存status 即每一课的信息，以便和快速开视频使用相同的结构的文件
-    fs.writeFile(filename, JSON.stringify(this.courseInfo.status), (err) => {
-      if (err) throw err;
-      console.log(`文件已被保存:${filename}`);
-    });
+    fs.writeFileSync(filename, JSON.stringify(this.courseInfo.status) );
   }
 
   async getCouseJsonPath(couseTitle) {
@@ -892,7 +904,11 @@ class Bot {
     // }, 30000, `错误：${handles.length}课程窗口没有关闭`)
   }
 
-
+  // 获取课程详细信息, prepareForLearn后才能使用
+  getCourseInfo(couseTitle){
+    let couse = CouseUrlMap[couseTitle]
+    return couse
+  }
 }
 
 
@@ -907,31 +923,36 @@ class Bot {
 //   await driver.findElement(By.id('btnLogin')).click()
 //
 // }
-function getCourseNameByCode(code) {
-  // liaoning
-  if (code == '4372') return '4372_毛泽东思想和中国特色社会主义理论体系概论'
-  if (code == '4487') return '4487_毛泽东思想和中国特色社会主义理论体系概论'
-  if (code == '4485') return '4485_毛泽东思想和中国特色社会主义理论体系概论'
-  if (code == '3935') return '3935_马克思主义基本原理概论'
-  if (code == '4609') return '4609_马克思主义基本原理概论'
-  if (code == '3945') return '3945_习近平新时代中国特色社会主义思想'
-  if (code == '4065') return '4065_习近平新时代中国特色社会主义思想'
-  if (code == '4611') return '4611_习近平新时代中国特色社会主义思想'
-  if (code == '4488') return '4488_习近平新时代中国特色社会主义思想'
-  if (code == '3937') return '3937_思想道德修养与法律基础'
-  if (code == '4374') return '4374_思想道德修养与法律基础'
-  if (code == '4491') return '4491_思想道德修养与法律基础'
-  if (code == '4614') return '4614_思想道德修养与法律基础'
-  if (code == '3944') return '3944_中国近现代史纲要'
-  if (code == '4373') return '4373_中国近现代史纲要'
-  if (code == '4615') return '4615_中国近现代史纲要'
-  if (code == '4387') return '4387_中国特色社会主义理论体系概论'
-  // heilongjiang
-  if (code == '4498') return '4498_中国特色社会主义理论体系概论'
+// function getCourseNameByCode(code) {
+//   // liaoning
+//   console.debug( "code=", code )
+//   if (code == '3796') return '3796_毛泽东思想和中国特色社会主义理论体系概论';
+//   if (code == '4372') return '4372_毛泽东思想和中国特色社会主义理论体系概论';
+//   if (code == '4487') return '4487_毛泽东思想和中国特色社会主义理论体系概论';
+//   if (code == '4485') return '4485_毛泽东思想和中国特色社会主义理论体系概论';
+//   if (code == '3935') return '3935_马克思主义基本原理概论';
+//   if (code == '4609') return '4609_马克思主义基本原理概论';
+//   if (code == '4486') return '4486_马克思主义基本原理概论';
+//   if (code == '3945') return '3945_习近平新时代中国特色社会主义思想';
+//   if (code == '3797') return '3797_习近平新时代中国特色社会主义思想';
+//   if (code == '4065') return '4065_习近平新时代中国特色社会主义思想';
+//   if (code == '4611') return '4611_习近平新时代中国特色社会主义思想';
+//   if (code == '4488') return '4488_习近平新时代中国特色社会主义思想';
+//   if (code == '3937') return '3937_思想道德修养与法律基础';
+//   if (code == '4374') return '4374_思想道德修养与法律基础';
+//   if (code == '4491') return '4491_思想道德修养与法律基础';
+//   if (code == '4614') return '4614_思想道德修养与法律基础';
+//   if (code == '3944') return '3944_中国近现代史纲要';
+//   if (code == '4373') return '4373_中国近现代史纲要';
+//   if (code == '4615') return '4615_中国近现代史纲要';
+//   if (code == '4492') return '4492_中国近现代史纲要';
+//   if (code == '4387') return '4387_中国特色社会主义理论体系概论';
+//   // heilongjiang
+//   if (code == '4498') return '4498_中国特色社会主义理论体系概论';
 
-  return null
+//   return null
 
-}
+// }
 
 
 

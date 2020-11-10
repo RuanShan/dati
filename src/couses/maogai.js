@@ -9,6 +9,7 @@ const {
 const fs = require('fs');
 
 const {answers} = require ('../../db/answers/xiList.json');
+const { handle503, handleDelay} = require ('../util');
 
 async function parseCouseMaoGai(driver) {
 
@@ -123,6 +124,7 @@ const awaitWrap = (promise) => {
   .catch(err => [err, null])
 }
 
+ 
 async function handleMaoGaiQuiz( driver, url, id ,num,isFirstPage,options,code){
   console.log('====================handleMaoGaiQuiz================');
   let xpath = "//div[@class='singlebutton quizstartbuttondiv']//button"
@@ -137,24 +139,25 @@ async function handleMaoGaiQuiz( driver, url, id ,num,isFirstPage,options,code){
   if(isFirstPage){
     console.log('==============isFirstPage==============');
     await driver.get(url)
+    
     // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
-    let title = await driver.getTitle()
-    if( title.startsWith( '503')){
-      await driver.get(url)
+    for( i=1; i<5; i++){
+      let ok = await handle503( driver, url, 5000*i );
+      if(ok){
+        break;
+      }
     }
-    console.log('title-----:',title);
-
     await driver.wait(until.elementLocated(By.xpath(xpath)), 15000);
     let button = await driver.findElement(By.xpath(xpath))
-    console.error("isFirstPage 延时3秒开始, 防止出现503, 服务器响应问题" )
     let date = new Date()
     await  driver.wait( function(){
       return new Promise((resolve, reject) => {
         console.error("isFirstPage 延时3秒" )
-        setTimeout(()=>{ resolve(true)}, 3000);
+        setTimeout(()=>{ resolve(true)}, 2000);
       })
     });
     console.error("isFirstPage 延时3秒结束", (new Date()).getTime() - date.getTime()  )
+
     await button.click() // 进入测试页面
   }
 
@@ -219,6 +222,15 @@ async function handleMaoGaiQuiz( driver, url, id ,num,isFirstPage,options,code){
   if(nextPage){
     console.log('=======has nextPage=======');
     await nextPage.click()
+
+    // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
+    for( i=1; i<5; i++){
+      let ok = await handle503( driver, null, 5000*i );
+      if(ok){
+        break;
+      }
+    }
+
     return await handleMaoGaiQuiz( driver, url, id ,num,false,options,code)
   }else if(submitPage){
     console.log('=======has submitPage=======');
@@ -228,6 +240,14 @@ async function handleMaoGaiQuiz( driver, url, id ,num,isFirstPage,options,code){
   console.log('options----:',options);
 
   if(options.submitquiz == 'yes'){
+    // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
+    for( i=1; i<5; i++){
+      let ok = await handle503( driver, null, 5000*i );
+      if(ok){
+        break;
+      }
+    }
+    await driver.wait(until.elementLocated(By.css('.submitbtns button.btn-secondary')), 15000);
     const submitButton = await driver.findElements(By.css('.submitbtns button.btn-secondary'))
     console.log('submitButton-----:',submitButton.length);
     await submitButton[1].click()
@@ -236,6 +256,9 @@ async function handleMaoGaiQuiz( driver, url, id ,num,isFirstPage,options,code){
     const ensureButton = await driver.findElements(By.css('.confirmation-dialogue input.btn-primary'))
     console.log('ensureButton-----:',ensureButton.length);
     await ensureButton[0].click()
+
+    // 提交后等 300ms，以免直接切换页面，请求没有发到服务器端？
+    await  handleDelay( driver, 300);
   }
 }
 module.exports={
