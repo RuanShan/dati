@@ -155,7 +155,7 @@ program.command('getcode [accountfile]')
     // [{username, password, subject}]
     let accounts = await getAccounts(accountfile)
 
-    console.log("检查账户登录...", accountfile)
+    console.log("检查账户登录...", accountfile, accounts.length)
 
     await getAccountsCourseCode(accounts)
 

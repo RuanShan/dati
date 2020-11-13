@@ -534,7 +534,7 @@ class Bot {
       try {
         // 超时15秒，多等点，网络有时慢
         let video = await driver.wait(until.elementLocated(By.tagName('video')), 15000);
-        let script = `$.ajaxSetup({ async : false}); var res = null; $.getJSON('/theme/blueonionre/modulesCompletion.php?cmid=${id}&id=${classId}&sectionid=${sectionId}', function(data){ res = data; }); return res;`
+        let script = `jQuery.ajaxSetup({ async : false}); var res = null; jQuery.getJSON('/theme/blueonionre/modulesCompletion.php?cmid=${id}&id=${classId}&sectionid=${sectionId}', function(data){ res = data; }); return res;`
         let res = await driver.executeScript(script);
         await  driver.wait( function(){
           return new Promise((resolve, reject) => {
@@ -562,8 +562,8 @@ class Bot {
    */
 
   async prepareForLearn(couseTitle) {
-    // 处理 “4498_中国特色社会主义理论体系概论” 情况
-    couseTitle = couseTitle.replace(/[\d_-\s]+/g, '')
+    // 处理 “4498_中国特色社会主义理论体系概论” 情况, 避免 "人文英语3" 中的3被清除
+    couseTitle = couseTitle.replace(/^[\d_-\s]+/, '')
     let driver = this.driver
     let mainHandle = this.mainHandle //await driver.getWindowHandle()
     let links = await this.getCousesLinks(driver, couseTitle);
@@ -586,14 +586,8 @@ class Bot {
         // 打开课程窗口
       }
     }
-    // links.forEach(async (a) => {
-    //   let displayed = await a.isDisplayed()
-    //   console.log(" isDisplayed ", displayed)
-    //   if (displayed) {
-    //     await a.click()
-    //     // 打开课程窗口
-    //   }
-    // })
+   
+    
     console.log('all tab opened0, links', links.length);
 
     await driver.wait(async () => {
@@ -617,13 +611,16 @@ class Bot {
         // 需要等待页面加载完成，即标题有中包含 课程
         await driver.wait(until.titleContains('课程'));
         let windowTitle = await driver.getTitle() // 课程： 习近平新时代中国特色社会主义思想
-        let title = windowTitle.replace('课程： ', '')
         url = await driver.getCurrentUrl() //http://shenyang.ouchn.cn/course/view.php?id=4372
         let parsedUrl = URL.parse(url, true)
         let code = parsedUrl.query['id']
-        console.debug(`couseTitle=${couseTitle} windowTitle = ${windowTitle}, parsed= ${parsedUrl} code=${code}`);
-        // 如果找到当前这门课的窗口
-        if (couseTitle && windowTitle.indexOf(couseTitle) >= 0) {
+        // 如果找到当前这门课的窗口,
+        // cousetitle=计算机应用基础(本)   windowtitle = 计算机应用基础（本）
+        let tidyWindowTitle = windowTitle.replace(/[\(\)（）]/g, '')
+        let tidyCouseTitle = couseTitle.replace(/[\(\)（）]/g, '')
+        console.debug(`couseTitle=${couseTitle} windowTitle = ${windowTitle}, url= ${url} code=${code} tidyWindowTitle=${tidyWindowTitle} tidyCouseTitle=${tidyCouseTitle}`);
+
+        if (tidyCouseTitle && tidyWindowTitle.indexOf(tidyCouseTitle) >= 0) {
           this.couseUrl = url
           this.couseTitle = couseTitle
           CouseUrlMap[code] = {
@@ -679,6 +676,9 @@ class Bot {
     // 毛泽东思想和中国特色社会主义理论体系概论, 统计学原理   思想道德修养与法律基础  管理学基础
     //  经济数学基础  计算机应用基础
     this.couseTitle = courseCodeOrTitle || this.couseTitle
+    // 有时传过来的参数 前面有空格，导致后面匹配不上对应的课程信息
+    this.couseTitle = this.couseTitle.replace(/^[\d_-\s]+/, '')
+
     console.debug("profileCouse=", courseCodeOrTitle, CouseUrlMap);
     let couse = null
     if (courseCodeOrTitle) {
@@ -715,6 +715,8 @@ class Bot {
         this.courseInfo = await parseCouseMaKeSi(this.driver)
       } else if (title == '中国特色社会主义理论体系概论') {
         this.courseInfo = await parseCouseMaoGai(this.driver)
+      }else{
+        this.courseInfo = await parseCouseBase(this.driver)
       }
 
       let position = 0;
@@ -735,8 +737,8 @@ class Bot {
   }
 
   async getCousesLinks(driver, couseTitle) {
-    // 等待 zaixuekecheng dom生成
 
+    
     // 支持的课程
 
     let couseTitles = SupportCouses.map((c) => c.title)
@@ -751,8 +753,10 @@ class Bot {
       let title = await titleElement.getText()
       let buttonElement = await couse.findElement(By.css('.course-entry button'));
       let text = await buttonElement.getText()
-      console.debug("getCousesLinks couse=", title, couseTitle.includes(title));
-      if (couseTitle.includes(title)) {
+      //   title="★中级财务会计（一）"  couseTitle = "中级财务会计（一）"
+
+      console.debug("getCousesLinks couse=", title, title.includes(couseTitle));
+      if (title.includes(couseTitle)) {
         links.push(buttonElement)
       }
     }
@@ -813,11 +817,15 @@ class Bot {
         jsonStr = answerList.makeJinDaiShiAnswerJson("./db/answers/jindaishi.txt")
         filename = './db/answers/' + code + '_jindaishiList.json'
       } else {
+        // 可能答案文件不存在，无法生成
         let answerList = new AnswerList()
-        jsonStr = answerList.makeAnswerJsonBase(`./db/answers/${code}_${title}.txt`)
-        filename = `./db/answers/${code}_${title}.json`
+        let answerfile = `./db/answers/${code}_${title}.txt`
+        if( fs.existsSync( answerfile)){
+          jsonStr = answerList.makeAnswerJsonBase()
+          filename = `./db/answers/${code}_${title}.json`            
+        }
       }
-      if (filename) {
+      if (filename ) {
         fs.writeFile(filename, JSON.stringify({
           answers: jsonStr
         }), (err) => {

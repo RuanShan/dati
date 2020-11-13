@@ -22,3 +22,4 @@ account.json
 *.csv
 *.bat
 account.json
+dist.zip.bak

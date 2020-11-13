@@ -1,0 +1,14 @@
+# mysql 导入
+load data infile 'd:/20201112.csv'
+
+into table couses character set utf8
+
+fields terminated by ',' optionally enclosed by '"' escaped by '"'
+
+lines terminated by '\r\n';
+
+
+
+node app.js  --username=1923001474389 --password=19870322 --type=video lmodules 6386_形势与政策
+
+node app.js  --username=1923001421269 --password=19750204 --type=video lmodules 6386_形势与政策

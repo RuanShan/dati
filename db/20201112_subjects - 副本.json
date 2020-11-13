@@ -1,0 +1,32 @@
+{
+  "accounts": [{
+    "username": "1923001474389",
+    "password": "19870322",
+    "subject":"形势与政策"
+  },
+  {
+    "username": "1923001421269",
+    "password": "19750204",
+    "subject":"公共行政学"
+  } ,
+  {
+    "username": "1823001470379",
+    "password": "19880806",
+    "subject":"个人与团队管理"
+  },
+  {
+    "username": "1923001421269",
+    "password": "19750204",
+    "subject":"公共行政学"
+  },
+  {
+    "username": "1823001470571",
+    "password": "19900901",
+    "subject":"管理学基础"
+  },
+  {
+    "username": "1923001419460",
+    "password": "19850812",
+    "subject":"管理英语1"
+  }]
+}

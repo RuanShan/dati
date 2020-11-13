@@ -77,8 +77,16 @@ async function getAccountsCourseCode(  accounts=[] ) {
       await bot.logout()
       console.log("登录账户: ", i, account.username, success)
     }
-    let filename =  './db/students/courses.json'
+    let filename =  './db/students/couses.json'
     fs.writeFileSync(filename, JSON.stringify(checkins));
+    let csvfile =  './db/students/couses.csv'
+    const csv = stringify(checkins, {  header: true,
+        columns: ['username','password','subject','checkin', 'code']
+      }, function(err, records){
+      fs.writeFileSync(csvfile, records)
+      console.log( "after save to file:", csvfile, checkins.length )
+    })
+
   }
 
    await driver.quit()
@@ -132,6 +140,7 @@ async function handleCreateLog(courseCode, username, password ) {
   if( !username || !password){
     throw  new Error( "用户名和密码是必须的")
   }
+  courseCode = courseCode.trim();
 
   let driver = await new Builder().forBrowser('chrome').build();
   let bot = new Bot(driver)
@@ -142,8 +151,25 @@ async function handleCreateLog(courseCode, username, password ) {
   await bot.prepareForLearn(courseCode)
   await bot.profileCouse(courseCode)
   await bot.createAnswerList(courseCode)
-  // await driver.quit()
-  return bot
+  await driver.quit()
+  //return bot
+}
+
+async function createLog(bot, courseCode, username, password ) {
+  if( !username || !password){
+    throw  new Error( "用户名和密码是必须的")
+  }
+  // 清除
+  courseCode = courseCode.trim();
+
+  console.log(" bot doing profile a course")
+    // 1934001474084
+    // 19930902
+  await bot.login(username, password)
+  await bot.prepareForLearn(courseCode)
+  await bot.profileCouse(courseCode)
+  await bot.createAnswerList(courseCode)
+
 }
 
 async function handleReadScore(courseCode, username, password){
@@ -421,13 +447,16 @@ async function handleLearnFinal(accounts, courseTitle, options ) {
 // 生成账号对应的课程数据文件
 async function handleGenSubject( accounts ){
   // 根据账号生成 数据文件
+
   for (let i = 0; i < accounts.length; i++) {
     let account = accounts[i]
     let username = account.username
     let password = account.password
     let course = account.subject // 课程名称
+    let driver = await new Builder().forBrowser('chrome').build();
+    let bot = new Bot(driver)
 
-    let bot = await handleCreateLog(course, username, password)
+    await createLog(bot, course, username, password)
 
     // 1. ./db/students/2021201400283_习近平新时代中国特色社会主义思想.json
     let studentfile = await bot.getCouseJsonPath( bot.couseTitle )
@@ -436,16 +465,26 @@ async function handleGenSubject( accounts ){
     // 课程代码在前，内部使用，作为课程文件命名
     let couseFullname = `${couse.code}_${couse.title}`
     let moduleType = 'video'
-    let dbfile = `./db/subjects/${couseFullname}.json`
-    console.log( studentfile, dbfile )
-    fs.copyFileSync( studentfile, dbfile )
-    // 2. 创建视频数据文件
+    let subjectfile = `./db/subjects/${couseFullname}.json`
+    console.log( studentfile, subjectfile )
+    fs.copyFileSync( studentfile, subjectfile )
+    // 2.1 创建视频数据文件
+    createModuleFile( couseFullname, moduleType )
+    // 2.2 创建测单元验数据文件
+    moduleType = 'quiz'
+    createModuleFile( couseFullname, moduleType )
+    // 2.3 创建文章数据文件
+    moduleType = 'page'
     createModuleFile( couseFullname, moduleType )
 
     // 3. 创建可执行文件, 文件的最后4个字符为课程号，
     let couseFullname2 = `${couse.title}_${couse.code}`
-
     createBinFile(couseFullname2)
+
+    // 4. 添加课程数据到indexdb.json
+    addCouseIntoDb( couse.code, couse.title )
+    await driver.quit()
+
   }
 }
 
@@ -511,7 +550,17 @@ function createBinFile(couseFullname){
 
 }
 
+function addCouseIntoDb(code, title){
 
+  let dbfile = `./db/subjects/indexdb.json`
+  let data = fs.readFileSync(dbfile, "utf-8")
+  let records = JSON.parse(data);
+  let couseFullname = `${code}_${title}`
+
+  records[code] = couseFullname
+  fs.writeFileSync(dbfile, JSON.stringify(records))
+
+}
 
 module.exports = {
   handleAccountsCheckin,
