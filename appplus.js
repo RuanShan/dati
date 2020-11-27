@@ -9,6 +9,8 @@ const {
 } = require('./src/util.js');
 
 
+const { BotPlus } = require( './src/botplus')
+const { PuppeteerDriver } = require( './src/puppeteer.js')
 const enableVideoApi = true
 const {
   handleCreateDb,
@@ -25,7 +27,7 @@ const {
   handleLearnFinal,
   handleGenSubject,
   handleGenAccounts
-} = require('./src/index')
+} = require('./src/indexplus')
 
 // example: node app.js -- createlog 4255 #毛泽东思想和中国特色社会主义理论体
 const isNetwork = true
@@ -339,6 +341,14 @@ program.command('genaccount')
     await  handleGenAccounts(accounts  )
 })
 
+program.command( 'test')  
+.description('test some function')
+.action(async function( ) {
+   
+   
+
+  testBotplus()
+})
 
 program.parse(process.argv)
 
