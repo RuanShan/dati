@@ -1,4 +1,5 @@
 .DS_Store
+chromium
 node_modules/
 dist/
 npm-debug.log
@@ -16,6 +17,7 @@ eng.traineddata
 app.log
 db/students
 db/subjects
+db/answers
 dist.zip
 account*
 account.json

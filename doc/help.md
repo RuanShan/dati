@@ -71,3 +71,10 @@ node app.js  --type=video createModuleFile 4487_毛泽东思想和中国特色�
 
 node app.js  --username=1921001407254 --password=19900226 createlog 国家开放大学学习指南
 node app.js  --type=video createModuleFile 4628_国家开放大学学习指南
+
+
+### pkg puppeteer
+
+https://stackoverflow.com/questions/49538076/how-do-you-package-a-puppeteer-app
+
+xcopy node_modules\puppeteer\.local-chromium\win64-818858\chrome-win\ chromium /E /H /I

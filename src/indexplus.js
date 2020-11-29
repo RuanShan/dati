@@ -26,7 +26,7 @@ const {
 // 检查登录账户是否可用
 async function handleAccountsCheckin(  accounts=[] ) {
 
-  let driver = await new Builder().forBrowser('chrome').build();
+  let driver = new PuppeteerDriver();
   let bot = new Bot(driver)
   console.log(" bot doing accounts checkin", accounts.length)
     // 1934001474084
@@ -97,7 +97,7 @@ async function getAccountsCourseCode(  accounts=[] ) {
 // 为课程代码创建数据库
 // accounts [{username, password, subject}]
 async function handleCreateDb(accounts=[] ) {
-  let driver = await new Builder().forBrowser('chrome').build();
+  let driver = new PuppeteerDriver();
   let bot = new Bot(driver)
   console.log("机器人初始化成功")
   for (let i = 0; i < accounts.length; i++) {
@@ -143,7 +143,7 @@ async function handleCreateLog(courseCode, username, password ) {
   }
   courseCode = courseCode.trim();
 
-  let driver = await new Builder().forBrowser('chrome').build();
+  let driver = new PuppeteerDriver();
   let bot = new Bot(driver)
   console.log(" bot doing profile a course")
     // 1934001474084
@@ -174,7 +174,7 @@ async function createLog(bot, courseCode, username, password ) {
 }
 
 async function handleReadScore(courseCode, username, password){
-  let driver = await new Builder().forBrowser('chrome').build();
+  let driver = new PuppeteerDriver();
   let bot = new Bot(driver)
   console.log(" bot doing handleReadScore")
   await bot.login(username, password)
@@ -186,7 +186,7 @@ async function handleReadScore(courseCode, username, password){
 
 // 取得课程进度
 async function handleGetCourseSumaries(accounts, courseCodes ){
-  let driver = await new Builder().forBrowser('chrome').build();
+  let driver = new PuppeteerDriver();
   let bot = new Bot(driver)
   console.log(" bot doing handleSumaryCourses")
 
@@ -216,7 +216,7 @@ async function handleGetCourseSumaries(accounts, courseCodes ){
 // 学习多门课程
 async function handleLearnCourses(accounts=[] , options = {}) {
 
-  let driver = await new Builder().forBrowser('chrome').build();
+  let driver = new PuppeteerDriver();
   let bot = new Bot(driver )
   console.log(" 机器人初始化成功，开始学习课程")
   for (let i = 0; i < accounts.length; i++) {
@@ -256,7 +256,7 @@ async function handleLearnCourse(courseCode, username, password) {
     throw  new Error( "用户名和密码是必须的")
   }
 
-  let driver = await new Builder().forBrowser('chrome').build();
+  let driver = new PuppeteerDriver();
   let bot = new Bot(driver, {username})
   console.log(" 机器人初始化成功，开始学习课程")
   let log = await bot.getLog( courseCode)
@@ -272,7 +272,7 @@ async function handleLearnCourse(courseCode, username, password) {
 
 // 学习某一个人的一节课
 async function handleLearnModuleByCode(courseCode, moduleCode,username, password, options) {
-  let driver = await new Builder().forBrowser('chrome').build();
+  let driver = new PuppeteerDriver();
   let bot = new Bot(driver, {username})
   console.debug("开始学习小节")
   // let username = '1934001474084'; // 1934001474084
@@ -292,7 +292,7 @@ async function handleLearnModuleByCode(courseCode, moduleCode,username, password
 
 // 学习账户中所有人的N节课
 async function handleLearnModuleOfAccounts(accounts, courseCode, moduleCodes, options ) {
-  let driver = await new Builder().forBrowser('chrome').build();
+  let driver = new PuppeteerDriver();
 
   let bot = new Bot(driver )
   console.debug("开始学习小节, 人数=", accounts.length)
@@ -344,9 +344,9 @@ async function handleLearnModuleOfAccounts(accounts, courseCode, moduleCodes, op
 }
 
 // 学习账户中所有人的N节课
-// 将账号循环放在外面，module放在里面，提高效率，但是处理视频模块
+// 将账号循环放在外面，module放在里面，提高效率，但不处理视频模块
 async function handleLearnModuleOfAccounts2(accounts, courseCode, moduleCodes, options ) {
-  let driver = await new Builder().forBrowser('chrome').build();
+  let driver = new PuppeteerDriver();
 
   let bot = new Bot(driver )
   console.debug("开始学习小节, 人数=", accounts.length)
@@ -390,6 +390,32 @@ async function handleLearnModuleOfAccounts2(accounts, courseCode, moduleCodes, o
   fs.writeFileSync(saveFilename, JSON.stringify(results));
 }
 
+/**
+ * 生成题库文件
+ * @param {[]} accounts { username, password, code }
+ */
+async function handleGenQuiz(accounts){
+  let driver = new PuppeteerDriver();
+
+  let bot = new Bot(driver )
+  console.debug("开始学习小节, 人数=", accounts.length)
+
+  for (let i = 0; i < accounts.length; i++) {
+    let account = accounts[i]
+    let { username, password, subject} = account
+    
+
+    if( !username || !password || !subject){
+      continue
+    }
+    await bot.login( username, password )
+    await bot.copyQuiz( subject )
+    await bot.logout()
+
+  }
+  await driver.quit()
+}
+
 async function saveUserJson(username, userInfo) {
   let filename =  './db/students/' + username  + '.json'
   fs.writeFileSync(filename, JSON.stringify(userInfo));
@@ -406,7 +432,7 @@ function isCouseJsonExists(username, courseTitle) {
 
 
 async function handleLearnFinal(accounts, courseTitle, options ) {
-  let driver = await new Builder().forBrowser('chrome').build();
+  let driver = new PuppeteerDriver();
   let bot = new Bot(driver)
 
   let results = []
@@ -454,7 +480,7 @@ async function handleGenSubject( accounts ){
     let username = account.username
     let password = account.password
     let course = account.subject // 课程名称
-    let driver = await new Builder().forBrowser('chrome').build();
+    let driver = new PuppeteerDriver();
     let bot = new Bot(driver)
 
     await createLog(bot, course, username, password)
@@ -577,5 +603,6 @@ module.exports = {
   getAccountsCourseCode,
   handleLearnFinal,
   handleGenSubject,
-  handleGenAccounts
+  handleGenAccounts,
+  handleGenQuiz
 }

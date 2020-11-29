@@ -13,7 +13,8 @@
   "devDependencies": {},
   "scripts": {
     "test": "test",
-    "pkg": "pkg . --targets=win-x86 --out-path=./dist"
+    "pkg": "pkg . --targets=win-x86 --out-path=./dist",
+    "pkgplus": "pkg --targets=win-x86 --out-path=./dist --config=pkgconfig.json appplus.js"
   },
   "bin": {
     "dati": "./app.js"

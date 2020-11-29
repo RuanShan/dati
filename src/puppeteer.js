@@ -2,6 +2,7 @@ const puppeteer = require('puppeteer');
 const iPhone = puppeteer.devices['iPhone 6'];
 
 const LAUNCH_PUPPETEER_OPTS = {
+  executablePath: './chromium/chrome.exe',
   headless: false,
   args: [
     '--no-sandbox',
@@ -42,8 +43,10 @@ class PuppeteerDriver {
     // await page.evaluate(
     //     '''() =>{ Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5,6], }); }''')
   }
-  closeBrowser() {
-    this.browser.close();
+  async closeBrowser() {
+    if( this.browser ){
+      await this.browser.close();
+    }
   }
 
   async login( username, password){
@@ -63,7 +66,7 @@ class PuppeteerDriver {
       newPage = pages[0]
     }
     
-    await newPage.goto(url, PAGE_PUPPETEER_OPTS);
+    await Promise.all( [ newPage.goto(url, PAGE_PUPPETEER_OPTS), newPage.waitForNavigation()]);
     return newPage
   }
 
@@ -72,9 +75,8 @@ class PuppeteerDriver {
     return pages
   }
 
-  async targets( ){
-    const pages = await this.browser.targets();
-    return pages
+  async quit( ){
+    this.closeBrowser();
   }
 
   async getPageContent(url, suburls=[]) {

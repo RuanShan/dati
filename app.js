@@ -312,10 +312,9 @@ program.command('gensubject')
       console.log("软件出现问题，请联系开发人员！")
       return
     }
-    let accounts = []
-    if (program.account || program.username) {
-      accounts = await getAccounts(program.account)
-    }
+ 
+    let  accounts = await getAccounts( )
+    
 
     // { username: '', password: '', subject: ''}
     await  handleGenSubject(accounts  )
@@ -345,18 +344,13 @@ program.parse(process.argv)
 if (program.username) console.log(`- ${program.username}`);
 if (program.password) console.log(`- ${program.password}`);
 
-async function testBotplus(){
-  let driver = new PuppeteerDriver
+ 
+async function getAccounts(accountfile=null) {
 
-  let bot = new BotPlus(driver)
+  if ( program.account ){
+    accountfile = program.account
+  }
 
-  await bot.login( '2021101201496', '19850114');
-  let subject = '国家开放大学学习指南'
-  await bot.prepareForLearn(subject);
-  await bot.profileCouse(subject)
-}
-
-async function getAccounts(accountfile) {
   let accounts = []
   if (/csv$/.test(accountfile)) {
     accounts = await getAccountsCsvByKey(accountfile)
@@ -367,6 +361,14 @@ async function getAccounts(accountfile) {
 
     accounts.push({ username: program.username, password: program.password  })
   }
+
+  // trim
+  accounts.forEach((acc)=>{
+    console.log( acc )
+    if( acc.subject ){
+      acc.subject = acc.subject.trim()
+    }
+  })
   return accounts
 }
 

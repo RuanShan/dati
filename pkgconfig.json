@@ -1,0 +1,9 @@
+{
+
+    "scripts": "node_modules/selenium-webdriver/lib/atoms/**/*.js",
+    "assets": "views/**/*",
+    "targets": [
+      "host"
+    ]
+
+}

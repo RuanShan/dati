@@ -26,7 +26,8 @@ const {
   getAccountsCourseCode,
   handleLearnFinal,
   handleGenSubject,
-  handleGenAccounts
+  handleGenAccounts,
+  handleGenQuiz
 } = require('./src/indexplus')
 
 // example: node app.js -- createlog 4255 #毛泽东思想和中国特色社会主义理论体
@@ -193,9 +194,9 @@ program.command('summary [accountfile]')
   })
 
 // 根据网络数据，学习所有课程
-program.command('learn [accountfile]')
+program.command('learn')
   .description('learn all courses.')
-  .action(async function(accountfile) {
+  .action(async function( ) {
     if (!isAvaible()) {
       console.log("软件出现问题，请联系开发人员！")
       return
@@ -206,8 +207,8 @@ program.command('learn [accountfile]')
     }
     // 取得所有账户信息
     // 为每个账户创建课程日志
-    let accounts = await getAccounts(accountfile)
-    console.log("learn all courses", accountfile, accounts.length)
+    let accounts = await getAccounts( )
+    console.log("accounts learn all courses",  accounts.length)
 
     await handleLearnCourses(accounts, options)
 
@@ -309,7 +310,7 @@ program.command('lfinal')
 // 生成课程数据文件
 program.command('gensubject')
   .description('生成课程数据文件')
-  .action(async function(accountfile) {
+  .action(async function( ) {
     if (!isAvaible()) {
       console.log("软件出现问题，请联系开发人员！")
       return
@@ -341,14 +342,20 @@ program.command('genaccount')
     await  handleGenAccounts(accounts  )
 })
 
-program.command( 'test')  
-.description('test some function')
+program.command( 'genquiz')  
+.description('生成测验数据文件')
 .action(async function( ) {
    
-   
+  let accounts = await getAccounts( )
 
-  testBotplus()
+  // { username: '', password: '', subject: '', code: ''}
+
+  handleGenQuiz(accounts)
+
 })
+
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
 
 program.parse(process.argv)
 
@@ -366,7 +373,17 @@ async function testBotplus(){
   await bot.profileCouse(subject)
 }
 
-async function getAccounts(accountfile) {
+async function getProgramAccounts( ){
+  
+} 
+
+async function getAccounts(accountfile=null) {
+
+  if ( program.account ){
+    accountfile = program.account
+  }
+console.log( 'accountfile=', accountfile)   
+
   let accounts = []
   if (/csv$/.test(accountfile)) {
     accounts = await getAccountsCsvByKey(accountfile)
@@ -374,9 +391,15 @@ async function getAccounts(accountfile) {
   } else if (/json$/.test(accountfile)) {
     accounts = await getAccountsJsonByKey(accountfile)
   } else if( program.username && program.password){
-
     accounts.push({ username: program.username, password: program.password  })
   }
+
+  // trim
+  accounts.forEach((acc)=>{
+    if( acc.subject ){
+      acc.subject = acc.subject.trim()
+    }
+  })
   return accounts
 }
 

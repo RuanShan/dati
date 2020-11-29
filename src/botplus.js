@@ -77,7 +77,8 @@ const {
 } = require('./couses/jindaishi')
 const {
   parseCouseBase,
-  handleQuizBase
+  handleQuizBase,
+  copyQuizBase
 } = require('./couses/baseplus')
 
 class BotPlus {
@@ -90,11 +91,9 @@ class BotPlus {
     this.mainPage = null;
     this.cousePage = null;
     this.mainHandle = null;
-    this.status = [];
     this.driver = driver;
     this.username = options.username
     this.password = ''
-    this.courseCode = '' // 当前课程代码，不同省市同一
     this.couseTitle = '' // 当前课程名称
     this.couseUrl = '' // 当前课程URL
     this.recursiveCount = 0 // 课程学习递归调用次数
@@ -197,7 +196,7 @@ class BotPlus {
     //await driver.get('http://passport.ouchn.cn/Account/Login?ReturnUrl=%2F');
     await page.type('#username', username)
     await page.type('#password', password)
-    await page.click(".login-form button[value='login']")
+    // await page.click(".login-form button[value='login']")
     //await driver.findElement(By.id('username')).sendKeys(username);
     //await driver.findElement(By.id('password')).sendKeys(password);
     //await handleVerifyCode(driver)
@@ -206,19 +205,18 @@ class BotPlus {
     let success = false
     //最多等待15秒
     try {
-      //const [response] = await Promise.all([  page.waitForNavigation(waitOptions),  page.click(selector, clickOptions),]);
+      const [response] = await Promise.all([  page.waitForNavigation( ),  page.click(".login-form button[value='login']"),]);
       
-      await Promise.all([ page.waitForNavigation()  ]).then(async(res)=>{
-        console.log( "promise.all", res )
+      let url = await page.url()
+
+      if(url.startsWith('http://passport.ouchn.cn')){
+        logger.error(`登录失败 ${username}!!`);
+      } else{
+        logger.info('登录成功!!');
+        success = true
         await page.goto('http://student.ouchn.cn/')
-
-      }).catch(async (e)=>{
-        console.log( "login catch ", e)
-        // 偶尔可能没有反应，直接进入学生主页，等待10秒
-        await Promise.all([page.waitForNavigation(), await  page.goto('http://student.ouchn.cn/')])
-        
-      })
-
+      }
+      
       // await driver.wait(until.titleContains('学生空间'), 10000).
       // then(async ()=>{
       //   await driver.wait(until.titleContains('学生空间'), 10000);
@@ -229,13 +227,11 @@ class BotPlus {
       //   await driver.wait(until.titleContains('学生空间'), 10000);
       // })
 
-      logger.info('登录成功!!');
       // 用于打开其它窗口后，再回来打开其它课程
       //this.mainHandle = await driver.getWindowHandle()
 
-      success = true
     } catch (e) {
-      logger.info('登录失败!!', e);
+      logger.error('登录失败!!', e);
     }
     this.mainPage = page
     return success
@@ -246,29 +242,29 @@ class BotPlus {
     await this.driver.get(url)
   }
   /**
-   * 学习一门课程
+   * 学习一门课程, 
+   * 根据 课程章节id，开始学习 
    * @param {Object} options - type - 学习某一类型的章节
    * @param {*} res
    */
   async learnCourse(options={}) {
-    if (this.recursiveCount >= 15) {
-      return
-    }
+    
+    
     let typeFilter = options.type
+    let lessionIndex = options.lessionIndex || 0
     console.info("课程学习中", this.couseTitle, 'options=', options)
-    this.recursiveCount += 1
-    let driver = this.driver
+    
+   
     let moduleStatus = this.courseInfo.status
-    let nourlModules = moduleStatus.filter((moduleStatus) => {
-      return moduleStatus.isFinish == '未完成'
-    })
+     
 
     for (let i = 0; i < moduleStatus.length; i++) {
       let lesson = moduleStatus[i];
       let isFinish = lesson.isFinish;
       let url = lesson.url
       let type = lesson.type
-      if (url.length == 0) {
+       
+      if( i< lessionIndex ){
         continue
       }
       if (typeFilter && typeFilter != type) {
@@ -280,7 +276,7 @@ class BotPlus {
         let done = false
         if (type == 'video') {
           //http://anhui.ouchn.cn/course/view.php?id=4257&sectionid=91623&mid=561704
-          let success = await this.watchVideo(lesson)
+          let success = await this.watchVideoByApi(lesson)
           if (success) {
             isFinish = '完成'
           }
@@ -305,34 +301,7 @@ class BotPlus {
     }
     //
 
-    if (nourlModules.length > 0) {
-      // 重新生成数据，重新学习，主要是学习视频，有些小节视频较多
-
-      if (this.recursiveCount < 15) {
-        logger.info(`课程${ this.couseTitle}递归了${this.recursiveCount}次，还没有完成。`)
-        await this.profileCouse()
-
-        let newModuleStatus = this.courseInfo.status
-        let newNourlModules = moduleStatus.filter((moduleStatus) => {
-          return moduleStatus.isFinish == '未完成'
-        })
-
-        console.info(`课程${ this.couseTitle}递归了${this.recursiveCount}次，${ nourlModules.length}节未学习 ${ newNourlModules.length}节未学习 。`)
-
-        if (newNourlModules.length < nourlModules.length) {
-          await this.learnCourse()
-        } else {
-          logger.error(`课程${ this.couseTitle}递归了${this.recursiveCount}次，没有新的可以学习章节，结束学习。`)
-          this.recursiveCount = 15
-        }
-
-      } else {
-        logger.error(`课程${ this.couseTitle}递归了15次，还没有完成，强制结束。`)
-      }
-    } else {
-      logger.info(`课程${ this.couseTitle}递归了 ${this.recursiveCount}次，终于完成。`)
-
-    }
+ 
   }
 
 
@@ -528,14 +497,14 @@ class BotPlus {
       let url = lesson.url
       let title = lesson.title
       // http://shenyang.ouchn.cn/mod/url/view.php?id=526346
-      await driver.get(`http://${course.host}/mod/url/view.php?id=${id}`);
+      let page = await driver.get(`http://${course.host}/mod/url/view.php?id=${id}`);
       // 可能被重定向到 xxx.pdf
       try {
-        // 超时15秒，多等点，网络有时慢
-        let video = await driver.wait(until.elementLocated(By.tagName('video')), 15000);
-        let script = `jQuery.ajaxSetup({ async : false}); var res = null; jQuery.getJSON('/theme/blueonionre/modulesCompletion.php?cmid=${id}&id=${classId}&sectionid=${sectionId}', function(data){ res = data; }); return res;`
-        let res = await driver.executeScript(script);
-        await  driver.wait( function(){
+        // puppeteer 不支持video，这里获取div#video. 直接执行ajax
+        let video = await page.waitForSelector('#video');
+        let script = `jQuery.ajaxSetup({ async : false}); var res = null; jQuery.getJSON('/theme/blueonionre/modulesCompletion.php?cmid=${id}&id=${classId}&sectionid=${sectionId}', function(data){ res = data; }); ;`
+        let res = await page.evaluate(script);
+        await  page.waitForFunction(  function(){
           return new Promise((resolve, reject) => {
             console.error("视频播放延时1秒, 防止API没有成功！" )
             setTimeout(()=>{ resolve(true)}, 1000);
@@ -544,12 +513,69 @@ class BotPlus {
         console.log('视频播放成功', typeof(res), res);
       } catch (ex) {
         success = false
+        logger.error(`视频播放失败：${this.username} ${id}`);
         console.error('视频播放失败：' + id, ex);
       }
     }
 
     return success
 
+
+  }
+
+
+  /**
+   * 生成测验题库 
+   * 调用前需先调用 
+   * @param {string} couseTitle -  如：“中国特色社会主义理论体系概论”
+  */
+  async copyQuiz( couseTitle ) {
+
+    await this.prepareForLearn( couseTitle )
+
+    let {
+      title,
+      code,
+      host
+    } = CouseUrlMap[couseTitle]
+
+    let filename = `db/subjects/${code}_${title}.json`
+    // 加载课程数据文件
+    this.getLog( couseTitle, { filename } )
+    
+
+    let urlbase = `http://${host}/mod/quiz/view.php`
+    
+    let lessons = this.courseInfo.status
+    
+    let quizArray = await copyQuizBase( this.driver, urlbase, lessons )
+
+      // 生成试题文件
+    let answerfile = `db/answers/${code}_${title}.txt`
+
+    let answerStr = ''
+    let LE =  "\r\n"
+    for( let i=0; i<quizArray.length; i++){
+      let quiz = quizArray[i];
+      answerStr = answerStr.concat( `形考${(i+1)} ${LE}` )
+      for( let j = 0; j<quiz.length; j++ ){
+        let question = quiz[j]
+        let { title, options, type, answer} = question
+
+        let line = ''
+        if( type =='h1'){
+          line =  title + LE
+        }else if( type == 'select'){
+          line =  `问题 ${title} ${LE}${options} ${LE}答案 ${answer} ${LE}`
+        }else if( type == 'tof'){
+          line =  `问题 ${title} ${LE}${options} ${LE}答案 ${answer} ${LE}`
+        }
+
+        answerStr = answerStr.concat( line )
+      }
+    }
+
+    fs.writeFileSync(answerfile, answerStr);
 
   }
 
@@ -676,22 +702,13 @@ class BotPlus {
       let windowTitle = await cousePage.title()
 
       console.log(" tab.title1 ", title, this.couseTitle, typeof(this.couseTitle))
-      if (title == '毛泽东思想和中国特色社会主义理论体系概论') {
-        this.courseInfo = await parseCouseMaoGai(this.driver)
-      } else if (title == '国家开放大学学习指南') {
+
+      let bybase = [ '国家开放大学学习指南','思想道德修养与法律基础','马克思主义基本原理概论','毛泽东思想和中国特色社会主义理论体系概论','中国特色社会主义理论体系概论','习近平新时代中国特色社会主义思想', '中国近现代史纲要']
+      
+      if (bybase.includes(title)) {
         this.courseInfo = await parseCouseBase(cousePage)
-      } else if (title == '习近平新时代中国特色社会主义思想') {
-        this.courseInfo = await parseCouseMaoGai(this.driver)
-      } else if (title == '思想道德修养与法律基础') {
-        this.courseInfo = await parseCouseMaoGai(this.driver)
-      } else if (title == '中国近现代史纲要') {
-        this.courseInfo = await parseCouseJinDaiShi(this.driver)
-      } else if (title == '马克思主义基本原理概论') {
-        this.courseInfo = await parseCouseMaKeSi(this.driver)
-      } else if (title == '中国特色社会主义理论体系概论') {
-        this.courseInfo = await parseCouseMaoGai(this.driver)
-      }else{
-        this.courseInfo = await parseCouseBase(this.driver)
+      } else{
+        this.courseInfo = await parseCouseBase(cousePage)
       }
 
       let position = 0;
@@ -716,24 +733,32 @@ class BotPlus {
 
     
     // 支持的课程
-
     let links = []
-    await mainPage.waitForSelector('#zaixuekecheng .media');
-    let div = await mainPage.$('#zaixuekecheng');
-    let couses = await mainPage.$$('#zaixuekecheng .media');
-    console.debug("getCousesLinks couses=", couseTitle, couses.length);
-    for (let i = 0; i < couses.length; i++) {
-      let couse = couses[i]
-      //let titleElement = await couse.$eval('.media-title', node=> node.innerText );
-      let title =  await couse.$eval('.media-title', node=> node.innerText );
-      let buttonElement = await couse.$('.course-entry button');
-      //let text =  await couse.$eval('.course-entry button', node=>node.innerText );
-      //   title="★中级财务会计（一）"  couseTitle = "中级财务会计（一）"
+    try{
+    
+      await mainPage.waitForSelector('#zaixuekecheng .media');
+      let div = await mainPage.$('#zaixuekecheng');
+      let couses = await mainPage.$$('#zaixuekecheng .media');
+      console.debug("getCousesLinks couses=", couseTitle, couses.length);
+      for (let i = 0; i < couses.length; i++) {
+        let couse = couses[i]
+        //let titleElement = await couse.$eval('.media-title', node=> node.innerText );
+        let title =  await couse.$eval('.media-title', node=> node.innerText );
+        let buttonElement = await couse.$('.course-entry button');
+        //let text =  await couse.$eval('.course-entry button', node=>node.innerText );
+        //   title="★中级财务会计（一）"  couseTitle = "中级财务会计（一）"
 
-      console.debug("getCousesLinks couse=", title, title.includes(couseTitle));
-      if (title.includes(couseTitle)) {
-        links.push(buttonElement)
+        console.debug("getCousesLinks couse=", title, title.includes(couseTitle));
+        if (title.includes(couseTitle)) {
+          links.push(buttonElement)
+        }
       }
+
+    }catch(e){
+      logger.error(`无法读取课程链接 ${this.username} ${this.password} ${couseTitle}`);
+      let path = `./db/log/${couseTitle}_${this.username}.jpg`
+      await mainPage.screenshot({type: 'jpeg', path: path})
+
     }
     // 不知因为什么原因会多一个, 可能是angular生成的隐藏button对象，
     return links
@@ -853,38 +878,35 @@ class BotPlus {
 
   // 关闭除main之外的其它tab
   async closeOtherTabs() {
-    let driver = this.driver
-    let mainHandle = this.mainHandle
-    let handles = await driver.getAllWindowHandles()
+    // let driver = this.driver
+    // let mainHandle = this.mainHandle
+    // let handles = await driver.getAllWindowHandles()
 
-    let locator = await driver.switchTo()
+    // let locator = await driver.switchTo()
 
-    for (let i = 0; i < handles.length; i++) {
-      let handle = handles[i]
-      console.log("mainHandle0", i, mainHandle, "handle = ", handle)
-      if (mainHandle != handle) {
-        try {
-          await locator.window(handle)
-          // 等待0.5秒，否则报错  target window already closed
-          // await  driver.wait( function(){
-          //   return new Promise((resolve, reject) => {
-          //     setTimeout(resolve, 500);
-          //   })
-          // });
+    // for (let i = 0; i < handles.length; i++) {
+    //   let handle = handles[i]
+    //   console.log("mainHandle0", i, mainHandle, "handle = ", handle)
+    //   if (mainHandle != handle) {
+    //     try {
+    //       await locator.window(handle)
+    //       // 等待0.5秒，否则报错  target window already closed
+    //       // await  driver.wait( function(){
+    //       //   return new Promise((resolve, reject) => {
+    //       //     setTimeout(resolve, 500);
+    //       //   })
+    //       // });
 
-          await driver.close()
-        } catch (e) {
-          console.error("driver.close", e);
-        }
-      }
-    }
-    await locator.window(mainHandle)
-    await driver.wait(until.titleContains('学生空间'), 20000);
-    console.debug("closeOtherTabs1");
-    // await driver.wait(async () => {
-    //   let handles = await driver.getAllWindowHandles()
-    //   return handles.length == 1
-    // }, 30000, `错误：${handles.length}课程窗口没有关闭`)
+    //       await driver.close()
+    //     } catch (e) {
+    //       console.error("driver.close", e);
+    //     }
+    //   }
+    // }
+    // await locator.window(mainHandle)
+    // await driver.wait(until.titleContains('学生空间'), 20000);
+    // console.debug("closeOtherTabs1");
+   
   }
 
   // 获取课程详细信息, prepareForLearn后才能使用
