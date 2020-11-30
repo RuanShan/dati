@@ -66,7 +66,10 @@ class PuppeteerDriver {
       newPage = pages[0]
     }
     
-    await Promise.all( [ newPage.goto(url, PAGE_PUPPETEER_OPTS), newPage.waitForNavigation()]);
+    await Promise.all( [ newPage.goto(url, PAGE_PUPPETEER_OPTS), newPage.waitForNavigation()]).catch(async e=>{
+      // 试试重新加载  
+      await newPage.reload()
+    });
     return newPage
   }
 

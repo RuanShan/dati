@@ -473,44 +473,86 @@ async function handleLearnFinal(accounts, courseTitle, options ) {
 
 // 生成账号对应的课程数据文件
 async function handleGenSubject( accounts ){
+  // 相同的课程只处理一个
+
+
   // 根据账号生成 数据文件
 
+  let gensubjectlog = './db/log/gensubject.log'
+  let logs=[]
+  let gencouseerror = {} // { code: error }
   for (let i = 0; i < accounts.length; i++) {
+
     let account = accounts[i]
+    let log = Object.assign( {}, account )
     let username = account.username
     let password = account.password
-    let course = account.subject // 课程名称
+    let couseName = account.subject // 课程名称
     let driver = new PuppeteerDriver();
     let bot = new Bot(driver)
 
-    await createLog(bot, course, username, password)
+    couseName = couseName.trim()
+    let isexist = true
+    let islogin = await bot.login(username, password)
+    let couse = null
+    let gencouse = true
+    if( islogin){
+      couse = await bot.prepareForLearn(couseName)
+    }
 
-    // 1. ./db/students/2021201400283_习近平新时代中国特色社会主义思想.json
-    let studentfile = await bot.getCouseJsonPath( bot.couseTitle )
-    // 重命名
-    let couse = bot.getCourseInfo( bot.couseTitle )
-    // 课程代码在前，内部使用，作为课程文件命名
-    let couseFullname = `${couse.code}_${couse.title}`
-    let moduleType = 'video'
-    let subjectfile = `./db/subjects/${couseFullname}.json`
-    console.log( studentfile, subjectfile )
-    fs.copyFileSync( studentfile, subjectfile )
-    // 2.1 创建视频数据文件
-    createModuleFile( couseFullname, moduleType )
-    // 2.2 创建测单元验数据文件
-    moduleType = 'quiz'
-    createModuleFile( couseFullname, moduleType )
-    // 2.3 创建文章数据文件
-    moduleType = 'page'
-    createModuleFile( couseFullname, moduleType )
+    if( couse ){
+      // 课程代码在前，内部使用，作为课程文件命名
+      let couseFullname = `${couse.code}_${couse.title}`
+      let subjectfile = `./db/subjects/${couseFullname}.json`
+      isexist =  fs.existsSync(subjectfile )
+      // 如果文件存在则跳过
+      iserror = gencouseerror[couse.code] === false
+      if( !isexist && !iserror){
+        await bot.profileCouse(couseName).catch((e)=>{
+          gencouse = false
+          gencouseerror[couse.code] = false
+        })
 
-    // 3. 创建可执行文件, 文件的最后4个字符为课程号，
-    let couseFullname2 = `${couse.title}_${couse.code}`
-    createBinFile(couseFullname2)
+        if( gencouse ){
+          await bot.createAnswerList(couseName)
+    
+          // 1. ./db/students/2021201400283_习近平新时代中国特色社会主义思想.json
+          let studentfile = await bot.getCouseJsonPath( bot.couseTitle )
+          // 重命名
+      
+          let moduleType = 'video'
+          console.log( studentfile, subjectfile )
+          fs.copyFileSync( studentfile, subjectfile )
+          // 2.1 创建视频数据文件
+          createModuleFile( couseFullname, moduleType )
+          // 2.2 创建测单元验数据文件
+          moduleType = 'quiz'
+          createModuleFile( couseFullname, moduleType )
+          // 2.3 创建文章数据文件
+          moduleType = 'page'
+          createModuleFile( couseFullname, moduleType )
+      
+          // 3. 创建可执行文件, 文件的最后4个字符为课程号，
+          let couseFullname2 = `${couse.title}_${couse.code}`
+          createBinFile(couseFullname2)
+      
+          // 4. 添加课程数据到indexdb.json
+          addCouseIntoDb( couse.code, couse.title )
+        }
 
-    // 4. 添加课程数据到indexdb.json
-    addCouseIntoDb( couse.code, couse.title )
+      }
+    
+    }
+
+    // 记录日志
+    log.subjectexists = isexist
+    log.loginsuccess = islogin
+    log.cousefound = !!couse
+    log.gencouse = gencouse
+    logs.push( log )
+    fs.writeFileSync(gensubjectlog, JSON.stringify(logs))
     await driver.quit()
+
 
   }
 }
