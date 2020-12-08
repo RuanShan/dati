@@ -338,7 +338,7 @@ async function handleQuizBase( driver, url,  options, answsers, num){
  * @param {*} options 
  * @param {*} answsers 
  */ 
-async function processOneQuiz( page,answsers,  num, options){
+async function processOneQuiz( page, answsers,  num, options){
   console.log('====================handleQuizBase================');
 
   //let queXpath = "//div[@class='que truefalse deferredfeedback notyetanswered']"
@@ -412,11 +412,13 @@ async function processOneQuiz( page,answsers,  num, options){
     console.log('=======has nextPage=======');
     await Promise.all( [page.waitForNavigation(), nextPage.click()])
 
-
-    return await processOneQuiz( page,answsers,num, options)
+    await processOneQuiz( page,answsers,num, options)
   }else if(submitPage){
     console.log('=======has submitPage=======');
     await submitPage.click()
+    // 提交后等 300ms，以免切换页面后，内容返回，导致新页面内容不正确
+    await  handleDelay( page );
+
   }
 
   console.log('options----:',options);
@@ -437,7 +439,7 @@ async function processOneQuiz( page,answsers,  num, options){
     await ensureButton[0].click()
 
     // 提交后等 300ms，以免直接切换页面，请求没有发到服务器端？
-    await  handleDelay( page, 300);
+    await  handleDelay( page );
   }
 }
  

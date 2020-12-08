@@ -429,7 +429,7 @@ async function handleGenQuiz(accounts){
 
 async function simpleLearn(accounts, options={}) {
   let driver = new PuppeteerDriver();
-  let { type } = options
+  let { type, submitquiz } = options
   let bot = new Bot(driver )
   console.debug("开始学习小节, 人数=", accounts.length)
 
@@ -488,20 +488,24 @@ async function simpleLearn(accounts, options={}) {
     console.log( "simpleLearn 4.1  查询当前用户当前课程进度 ", accountInfo)
     // 如果当前课程可以学习
     // 5. 学习视频，并保存进度
-    // if( ( type == null || type=='video') && !accountInfo.videodone ){
-    //   await bot.learnCouse({ type: 'video' })
-    //   accountInfo.videodone = true
-    // }
+    if( ( type == null || type=='video') && !accountInfo.videodone ){
+      await bot.learnCouse({ type: 'video' })
+      accountInfo.videodone = true
+      addAccount( accountInfo )
+    }
     // // 6. 学习单元测试，并保存进度
     if( ( type == null || type=='quiz') && !accountInfo.quizdone ){
       await bot.learnCouse({ type: 'quiz' })
-      accountInfo.quizdone = true
+      if( submitquiz == 'yes'){
+        accountInfo.quizdone = true
+        addAccount( accountInfo )
+      }
     }
 
     // 7. 学习终结性考试，并保存进度
      
     // 8. 保存账号数据
-    addAccount( accountInfo )
+  
     await bot.logout()
 
   }

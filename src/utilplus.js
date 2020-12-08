@@ -111,9 +111,9 @@ function getCourseNameByCode(code) {
 
 }
 
-async function handle503( page, url, delay){
+async function handle503( page, url, delay=10000){
   let title = await page.title();
-  delay = delay || 10000
+
   let isOK = true
   console.log( 'handle503 title=', title)
   if( title.startsWith( '503 Service')){
@@ -141,12 +141,12 @@ async function handle503( page, url, delay){
 }
 
 
-async function handleDelay( page, delay ){
-  delay = delay || 500
-  await  driver.waitForFunction( function(){
+async function handleDelay( page, delay = 300 ){
+
+  await  page.waitForFunction( function(){
     return new Promise((resolve, reject) => {
       console.error("ensureButton 延时300ms" )
-      setTimeout(()=>{ resolve(true)}, delay);
+      setTimeout(()=>{ resolve(true)}, 300);
     })
   });
 }

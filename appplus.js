@@ -82,7 +82,9 @@ program.command('simplelearn')
       return
     }
     let type = ( program.type || null)
-    let options = { type: type }
+    let submitquiz = ( program.submitquiz || null)
+    
+    let options = { type, submitquiz }
     let accounts = await getAccounts()  
        
     await simpleLearn(accounts, options)
