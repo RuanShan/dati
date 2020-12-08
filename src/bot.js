@@ -114,7 +114,7 @@ class Bot {
     this.couseTitle = '' // 当前课程名称
     this.couseUrl = '' // 当前课程URL
     this.recursiveCount = 0 // 课程学习递归调用次数
-    this.courseInfo = {
+    this.couseInfo = {
       score: {
         progress: 0
       },
@@ -188,8 +188,8 @@ class Bot {
           }
         }
       }
-      this.courseInfo.status = res.status
-      fs.writeFile(filename, JSON.stringify(this.courseInfo), (err) => {
+      this.couseInfo.status = res.status
+      fs.writeFile(filename, JSON.stringify(this.couseInfo), (err) => {
         if (err) throw err;
         console.log(`文件已被保存:${filename}`);
       });
@@ -251,7 +251,7 @@ class Bot {
    * @param {Object} options - type - 学习某一类型的章节
    * @param {*} res
    */
-  async learnCourse(options={}) {
+  async learnCouse(options={}) {
     if (this.recursiveCount >= 15) {
       return
     }
@@ -259,7 +259,7 @@ class Bot {
     console.info("课程学习中", this.couseTitle, 'options=', options)
     this.recursiveCount += 1
     let driver = this.driver
-    let moduleStatus = this.courseInfo.status
+    let moduleStatus = this.couseInfo.status
     let nourlModules = moduleStatus.filter((moduleStatus) => {
       return moduleStatus.isFinish == '未完成'
     })
@@ -313,7 +313,7 @@ class Bot {
         logger.info(`课程${ this.couseTitle}递归了${this.recursiveCount}次，还没有完成。`)
         await this.profileCouse()
 
-        let newModuleStatus = this.courseInfo.status
+        let newModuleStatus = this.couseInfo.status
         let newNourlModules = moduleStatus.filter((moduleStatus) => {
           return moduleStatus.isFinish == '未完成'
         })
@@ -321,7 +321,7 @@ class Bot {
         console.info(`课程${ this.couseTitle}递归了${this.recursiveCount}次，${ nourlModules.length}节未学习 ${ newNourlModules.length}节未学习 。`)
 
         if (newNourlModules.length < nourlModules.length) {
-          await this.learnCourse()
+          await this.learnCouse()
         } else {
           logger.error(`课程${ this.couseTitle}递归了${this.recursiveCount}次，没有新的可以学习章节，结束学习。`)
           this.recursiveCount = 15
@@ -341,7 +341,7 @@ class Bot {
 
     logger.info(`课程${ this.couseTitle} 小节 ${moduleCode} 开始学习。`)
     let driver = this.driver
-    let moduleStatus = this.courseInfo.status
+    let moduleStatus = this.couseInfo.status
     let success = false
     for (let i = 0; i < moduleStatus.length; i++) {
       let lesson = moduleStatus[i];
@@ -650,7 +650,7 @@ class Bot {
      
 
     let driver = this.driver
-    let moduleStatus = this.courseInfo.status
+    let moduleStatus = this.couseInfo.status
 
     for (let i = 0; i < moduleStatus.length; i++) {
       let lesson = moduleStatus[i];
@@ -701,35 +701,35 @@ class Bot {
 
       console.log(" tab.title1 ", title, this.couseTitle, typeof(this.couseTitle))
       if (title == '毛泽东思想和中国特色社会主义理论体系概论') {
-        this.courseInfo = await parseCouseMaoGai(this.driver)
+        this.couseInfo = await parseCouseMaoGai(this.driver)
       } else if (title == '国家开放大学学习指南') {
-        //this.courseInfo = await parseCouseZhiNan( this.driver )
-        this.courseInfo = await parseCouseMaoGai(this.driver)
+        //this.couseInfo = await parseCouseZhiNan( this.driver )
+        this.couseInfo = await parseCouseMaoGai(this.driver)
       } else if (title == '习近平新时代中国特色社会主义思想') {
-        this.courseInfo = await parseCouseMaoGai(this.driver)
+        this.couseInfo = await parseCouseMaoGai(this.driver)
       } else if (title == '思想道德修养与法律基础') {
-        this.courseInfo = await parseCouseMaoGai(this.driver)
+        this.couseInfo = await parseCouseMaoGai(this.driver)
       } else if (title == '中国近现代史纲要') {
-        this.courseInfo = await parseCouseJinDaiShi(this.driver)
+        this.couseInfo = await parseCouseJinDaiShi(this.driver)
       } else if (title == '马克思主义基本原理概论') {
-        this.courseInfo = await parseCouseMaKeSi(this.driver)
+        this.couseInfo = await parseCouseMaKeSi(this.driver)
       } else if (title == '中国特色社会主义理论体系概论') {
-        this.courseInfo = await parseCouseMaoGai(this.driver)
+        this.couseInfo = await parseCouseMaoGai(this.driver)
       }else{
-        this.courseInfo = await parseCouseBase(this.driver)
+        this.couseInfo = await parseCouseBase(this.driver)
       }
 
       let position = 0;
-      for (let i = 0; i < this.courseInfo.status.length; i++) {
-        if (this.courseInfo.status[i].type == 'quiz') {
-          this.courseInfo.status[i].position = position;
+      for (let i = 0; i < this.couseInfo.status.length; i++) {
+        if (this.couseInfo.status[i].type == 'quiz') {
+          this.couseInfo.status[i].position = position;
           position++;
         }
       }
 
       // let endAt = new Date()
-      // this.courseInfo.score.startAt = startAt
-      // this.courseInfo.score.endAt = endAt
+      // this.couseInfo.score.startAt = startAt
+      // this.couseInfo.score.endAt = endAt
       await this.saveCouseJson(this.couseTitle)
     } else {
       console.debug(`课程代码 ${ this.couseTitle} ${courseCodeOrTitle} 找不到课程url`);
@@ -766,9 +766,9 @@ class Bot {
 
   async saveCouseJson(classId) {
     let filename = await this.getCouseJsonPath(classId)
-    //console.log('this.courseInfo----:',this.courseInfo);
+    //console.log('this.couseInfo----:',this.couseInfo);
     // 保存 课程信息时只保存status 即每一课的信息，以便和快速开视频使用相同的结构的文件
-    fs.writeFileSync(filename, JSON.stringify(this.courseInfo.status) );
+    fs.writeFileSync(filename, JSON.stringify(this.couseInfo.status) );
   }
 
   async getCouseJsonPath(couseTitle) {

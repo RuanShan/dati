@@ -55,7 +55,8 @@ async function parseCouseBase(page) {
       console.log(`levelOne.text ${i} ${sectionId} ${text} 没有内容。`)
       continue
     }
-    if( /课程文件|资源更新区|电大资源区|资源自建区/.test( text )){
+    // 电大资源区，自建资源区
+    if( /课程文件|资源更新区|电大资源区|资源自建区|资源区/.test( text )){
       continue
     }
     // 课程文件, 资源更新区, 电大资源区
@@ -221,15 +222,6 @@ async function copyOneQuiz( page,  isFirstPage, url ){
  
     await page.waitForSelector(startButtonSelector);
     let button = await  page.$(startButtonSelector)
-    
-    // let date = new Date()
-    // await  driver.wait( function(){
-    //   return new Promise((resolve, reject) => {
-    //     console.error("isFirstPage 延时3秒" )
-    //     setTimeout(()=>{ resolve(true)}, 2000);
-    //   })
-    // });
-    // console.error("isFirstPage 延时3秒结束", (new Date()).getTime() - date.getTime()  )
 
     await Promise.all( [page.waitForNavigation(), button.click()]) // 进入测试页面
   }
@@ -314,14 +306,27 @@ async function copyOneQuiz( page,  isFirstPage, url ){
   return copys
 }
 
+/**
+ * 
+ * @param {*} driver 
+ * @param {*} url 
+ * @param {*} options 
+ * @param {*} answsers 
+ * @param {*} num - 考试在所有考试中的index
+ */
+async function handleQuizBase( driver, url,  options, answsers, num){
+  let startButtonSelector="div.quizstartbuttondiv button[type=submit]"
 
-// 抽离成公共方法
-const awaitWrap = (promise) => {
- return promise
-  .then(data => [null, data])
-  .catch(err => [err, null])
+  let page = await driver.get( url )
+  await handle503(page, url);
+
+    await page.waitForSelector(startButtonSelector);
+    let button = await  page.$(startButtonSelector)
+
+    await Promise.all( [page.waitForNavigation(), button.click()]) // 进入测试页面
+
+    await processOneQuiz( page,answsers, num, options )
 }
-
 
 /**
  * 
@@ -331,115 +336,84 @@ const awaitWrap = (promise) => {
  * @param {*} num 测试在所有测验中的位置，对应题库的索引
  * @param {*} isFirstPage 
  * @param {*} options 
- * @param {*} code 
+ * @param {*} answsers 
  */ 
-async function handleQuizBase( driver, url, id ,num,isFirstPage,options,code){
+async function processOneQuiz( page,answsers,  num, options){
   console.log('====================handleQuizBase================');
-  let xpath = "//div[@class='singlebutton quizstartbuttondiv']//button"
+
   //let queXpath = "//div[@class='que truefalse deferredfeedback notyetanswered']"
   let queSelector = ".que"
-  let nextPageXpath = "//input[@value='下一页']"
-  let prevPageXpath = "//input[@value='上一页']"
-  let submitPageXpath = "//input[@value='结束答题…']"
-  let queContentXpath="//div[@class='qtext']/p"
-  let queAnswerXpath="//div[@class='answer']//input"
-  console.log('isFirstPage-----:',isFirstPage);
-  if(isFirstPage){
-    console.log('==============isFirstPage==============');
-    await driver.get(url)
-    
-    // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
-    for( i=1; i<5; i++){
-      let ok = await handle503( driver, url, 5000*i );
-      if(ok){
-        break;
-      }
-    }
-    await driver.wait(until.elementLocated(By.xpath(xpath)), 15000);
-    let button = await driver.findElement(By.xpath(xpath))
-    let date = new Date()
-    await  driver.wait( function(){
-      return new Promise((resolve, reject) => {
-        console.error("isFirstPage 延时3秒" )
-        setTimeout(()=>{ resolve(true)}, 2000);
-      })
-    });
-    console.error("isFirstPage 延时3秒结束", (new Date()).getTime() - date.getTime()  )
+  let nextPageSelector = "input[value=下一页]"
+  let prevPageSelector = "input[value=上一页]"
+  let submitPageSelector = "input[value=结束答题…]"
+  await handle503(page);
 
-    await button.click() // 进入测试页面
-  }
+  await page.waitForSelector( queSelector );
 
-  await driver.wait(until.elementLocated(By.css(queSelector)), 15000);
   // 可能不存在
-  const [err1, nextPage] = await awaitWrap(driver.findElement(By.xpath(nextPageXpath)))
-  const [err2, prevPage] = await awaitWrap(driver.findElement(By.xpath(prevPageXpath)))
-  const [err3, submitPage] = await awaitWrap(driver.findElement(By.xpath(submitPageXpath)))
+  const nextPage = await page.$(nextPageSelector)
+  const prevPage = await page.$(prevPageSelector)
+  const submitPage = await page.$(submitPageSelector)
 
-  let questions = await driver.findElements(By.css(queSelector))
+  let questions = await page.$$(queSelector)
   console.debug( `questions:${questions.length}`)
 
   let keyWords1 = ['一', '二', '三', '四'];
-  let level_1 = 0;
-  let fakeQuestionNum = 0; // 大标题不是问题，所以
-
-  let jsonStr = JSON.parse(fs.readFileSync('./db/answers/'+code+'_xiList.json','utf8'));
-  jsonStr = jsonStr.answers
-  // console.log('jsonStr----:',jsonStr);
-  // let jsonStr = ''
+  
   let keynum = 0
   for (let i = 0; i < questions.length; i++) {
     let questionEle = questions[i];
-    let content = await questionEle.findElement(By.css('.qtext p'))
-    let answerInputs = await questionEle.findElements(By.css('.answer input'))
-    let answerLabels = await questionEle.findElements(By.css('.answer label'))
-    let question = await content.getText()
+    let question = await questionEle.$eval( '.qtext p', node=> node.innerText)
+    let answerWraps = await questionEle.$$('.answer')
+
     console.log('question---:',question);
     if(keyWords1.indexOf(question[0]) != -1){
       keynum = 0; // 每一道题的下标
       level_1=keyWords1.indexOf(question[0]);
       continue;
     }
-    let key = jsonStr[num][level_1][keynum]
+    let key = answsers[num][level_1][keynum]
     console.log('key---:',key);
-    for( let j = 0; j< answerInputs.length; j++){
-      let answer = answerInputs[j];
-      let label = answerLabels[j]
-      let a =  await answer.getAttribute('value')
-      let b =  await label.getText()
-      console.log(a+b);
-      if(b.length==1){//pan duan ti
-        if(b==key.answer){
-          await label.click()
-          console.log('chose '+b);
-        }else{
-          continue
+
+
+    for( let j = 0; j< answerWraps.length; j++){
+      let answer = answerWraps[j];
+      let labels = await answer.$$('label')
+      let labelTexts  = await answer.$$eval('label', nodes=> nodes.map( n=>n.innerText))
+
+      console.log(labelTexts);
+      if(labelTexts.length==2){//判断题
+        for( let k = 0; k< labelTexts.length; k++){
+          let b = labelTexts[k]
+          let label = labels[k]
+          if(b==key.answer){
+            await label.click()
+            console.log('chose '+b);
+          }else{
+            continue
+          }
         }
-      }else{//xuan ze ti
-        if(b.replace(/\s*/g,"").replace(".","").substring(1)==key.answer.replace(/\s*/g,"").replace(".","").substring(1)){
-          await label.click()
-          console.log('chose '+b);
+        
+      }else{//选择题
+        for( let k = 0; k< labelTexts.length; k++){
+          let b = labelTexts[k]
+          let label = labels[k]
+          if(b.replace(/\s*/g,"").replace(".","").substring(1)==key.answer.replace(/\s*/g,"").replace(".","").substring(1)){
+            await label.click()
+            console.log('chose '+b);
+          }
         }
       }
     }
     keynum++;
-
   }
-  console.log('nextPage----:',nextPage);
-  console.log('submitPage----:',submitPage);
 
   if(nextPage){
     console.log('=======has nextPage=======');
-    await nextPage.click()
+    await Promise.all( [page.waitForNavigation(), nextPage.click()])
 
-    // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
-    for( i=1; i<5; i++){
-      let ok = await handle503( driver, null, 5000*i );
-      if(ok){
-        break;
-      }
-    }
 
-    return await handleQuizBase( driver, url, id ,num,false,options,code)
+    return await processOneQuiz( page,answsers,num, options)
   }else if(submitPage){
     console.log('=======has submitPage=======');
     await submitPage.click()
@@ -449,24 +423,21 @@ async function handleQuizBase( driver, url, id ,num,isFirstPage,options,code){
 
   if(options.submitquiz == 'yes'){
     // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
-    for( i=1; i<5; i++){
-      let ok = await handle503( driver, null, 5000*i );
-      if(ok){
-        break;
-      }
-    }
-    await driver.wait(until.elementLocated(By.css('.submitbtns button.btn-secondary')), 15000);
-    const submitButton = await driver.findElements(By.css('.submitbtns button.btn-secondary'))
+    
+    await page.waitForSelector( '.submitbtns button.btn-secondary' );
+
+    const submitButton = await page.$$('.submitbtns button.btn-secondary')
     console.log('submitButton-----:',submitButton.length);
     await submitButton[1].click()
 
-    await driver.wait(until.elementLocated(By.css('.confirmation-dialogue input.btn-primary')), 15000);
-    const ensureButton = await driver.findElements(By.css('.confirmation-dialogue input.btn-primary'))
+    await page.waitForSelector( '.confirmation-dialogue input.btn-primary' );
+
+    const ensureButton = await page.$$('.confirmation-dialogue input.btn-primary')
     console.log('ensureButton-----:',ensureButton.length);
     await ensureButton[0].click()
 
     // 提交后等 300ms，以免直接切换页面，请求没有发到服务器端？
-    await  handleDelay( driver, 300);
+    await  handleDelay( page, 300);
   }
 }
  

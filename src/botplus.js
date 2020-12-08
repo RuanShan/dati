@@ -94,10 +94,10 @@ class BotPlus {
     this.driver = driver;
     this.username = options.username
     this.password = ''
+
     this.couseTitle = '' // 当前课程名称
-    this.couseUrl = '' // 当前课程URL
     this.recursiveCount = 0 // 课程学习递归调用次数
-    this.courseInfo = {
+    this.couseInfo = {
       score: {
         progress: 0
       },
@@ -125,7 +125,7 @@ class BotPlus {
 
         let res = JSON.parse(data);
         console.info(`读取课程数据 ${couseTitle}`);
-        that.courseInfo.status = res;
+        this.couseInfo.status = res;
       }
     } else {
       logger.error(`无法读取课程数据文件 ${filename}`);
@@ -171,8 +171,8 @@ class BotPlus {
           }
         }
       }
-      this.courseInfo.status = res.status
-      fs.writeFile(filename, JSON.stringify(this.courseInfo), (err) => {
+      this.couseInfo.status = res.status
+      fs.writeFile(filename, JSON.stringify(this.couseInfo), (err) => {
         if (err) throw err;
         console.log(`文件已被保存:${filename}`);
       });
@@ -247,15 +247,15 @@ class BotPlus {
    * @param {Object} options - type - 学习某一类型的章节
    * @param {*} res
    */
-  async learnCourse(options={}) {
+  async learnCouse(options={}) {
     
     
     let typeFilter = options.type
     let lessionIndex = options.lessionIndex || 0
-    console.info("课程学习中", this.couseTitle, 'options=', options)
+    console.info("课程学习中", this.couseTitle, 'options=', options,  this.couseInfo.status.length)
     
    
-    let moduleStatus = this.courseInfo.status
+    let moduleStatus = this.couseInfo.status
      
 
     for (let i = 0; i < moduleStatus.length; i++) {
@@ -309,7 +309,7 @@ class BotPlus {
 
     logger.info(`课程${ this.couseTitle} 小节 ${moduleCode} 开始学习。`)
     let driver = this.driver
-    let moduleStatus = this.courseInfo.status
+    let moduleStatus = this.couseInfo.status
     let success = false
     for (let i = 0; i < moduleStatus.length; i++) {
       let lesson = moduleStatus[i];
@@ -415,21 +415,27 @@ class BotPlus {
       } = CouseUrlMap[this.couseTitle]
       let url = `http://${host}/mod/quiz/view.php?id=${id}`
 
+      let fullname = `${title}_${code}`
+      let answerfile = `./db/answers/${fullname}.json`
+      let json = JSON.parse(fs.readFileSync(answerfile,'utf8'));
+      let answsers = json.answers
+      // 加载题库文件
+
       console.log('this.couseTitle---:', this.couseTitle);
       if (title == '习近平新时代中国特色社会主义思想') {
-        await handleMaoGaiQuiz(driver, url, id, num, true, options, code)
+        await handleQuizBase(driver, url, options, answsers, num )
       } else if (title == '国家开放大学学习指南') {
-        await handleZhiNanQuiz(driver, url, id, num, true, options, code)
+        await handleZhiNanQuiz(driver, url, id, num, true, options, answsers)
       } else if (title == '思想道德修养与法律基础') {
-        await handleQuizBase(driver, url, id, num, true, options, code)
+        await handleQuizBase(driver, url, options, answsers, num )
       } else if (title == '毛泽东思想和中国特色社会主义理论体系概论') {
-        await handleQuizBase(driver, url, id, num, true, options, code)
+        await handleQuizBase(driver, url, options, answsers, num )
       } else if (title == '马克思主义基本原理概论') {
-        await handleQuizBase(driver, url, id, num, true, options, code)
+        await handleQuizBase(driver, url, options, answsers, num )
       } else if (title == '中国近现代史纲要') {
-        await handleQuizBase(driver, url, id, num, true, options, code)
-      } else if (code == '4387') { // 中国特色社会主义理论体系概论
-        await handleQuizBase(driver, url, id, num, true, options, code)
+        await handleQuizBase(driver, url, options, answsers, num )
+      } else  {  
+        await handleQuizBase(driver, url, options, answsers, num )
       }
       console.log('this quiz is done');
     }
@@ -546,7 +552,7 @@ class BotPlus {
 
     let urlbase = `http://${host}/mod/quiz/view.php`
     
-    let lessons = this.courseInfo.status
+    let lessons = this.couseInfo.status
     
     let quizArray = await copyQuizBase( this.driver, urlbase, lessons )
 
@@ -587,6 +593,7 @@ class BotPlus {
    */
 
   async prepareForLearn(couseTitle) {
+    console.log( "============= prepareForLearn0 =============")
     // 处理 “4498_中国特色社会主义理论体系概论” 情况, 避免 "人文英语3" 中的3被清除
     couseTitle = couseTitle.replace(/^[\d_-\s]+/, '')
     let driver = this.driver
@@ -600,6 +607,7 @@ class BotPlus {
     console.log( 'links', links.length)
     // https://segmentfault.com/q/1010000019135401
     // https://www.zhihu.com/question/306082778/answer/556674503
+    // 每次点击新建页面，需要关闭
     const newPagePromise = new Promise(x => browser.once('targetcreated', target => x(target.page()))); 
 
     await links[0].click()
@@ -619,12 +627,13 @@ class BotPlus {
         let code = parsedUrl.query['id']
         // 如果找到当前这门课的窗口,
         // cousetitle=计算机应用基础(本)   windowtitle = 计算机应用基础（本）
-        let tidyWindowTitle = windowTitle.replace(/[\(\)（）]/g, '')
-        let tidyCouseTitle = couseTitle.replace(/[\(\)（）]/g, '')
+        //   "Photoshop图像处理".toLowerCase() => "photoshop图像处理"
+
+        let tidyWindowTitle = windowTitle.replace(/[\(\)（）]/g, '').toLowerCase()
+        let tidyCouseTitle = couseTitle.replace(/[\(\)（）]/g, '').toLowerCase()
         console.debug(`couseTitle=${couseTitle} windowTitle = ${windowTitle}, url= ${url} code=${code} tidyWindowTitle=${tidyWindowTitle} tidyCouseTitle=${tidyCouseTitle}`);
 
         if (tidyCouseTitle && tidyWindowTitle.indexOf(tidyCouseTitle) >= 0) {
-          this.couseUrl = url
           this.couseTitle = couseTitle
           CouseUrlMap[code] = {
             host: parsedUrl.host,
@@ -644,6 +653,9 @@ class BotPlus {
     cousePage.close()
     console.log("current window url=", url)
     this.recursiveCount = 0
+
+    console.log( "============= prepareForLearn1 =============")
+
     return CouseUrlMap[couseTitle]
   }
 
@@ -652,7 +664,7 @@ class BotPlus {
      
 
     let driver = this.driver
-    let moduleStatus = this.courseInfo.status
+    let moduleStatus = this.couseInfo.status
 
     for (let i = 0; i < moduleStatus.length; i++) {
       let lesson = moduleStatus[i];
@@ -673,8 +685,11 @@ class BotPlus {
   //   await driver.findElement(By.id('btnLogin')).click()
   //
   // }
+
   // 生成某一门课的db log，需要知道这门课的url
   async profileCouse(courseCodeOrTitle) {
+    console.log( "============= profileCouse0 =============")
+
     // 毛泽东思想和中国特色社会主义理论体系概论, 统计学原理   思想道德修养与法律基础  管理学基础
     //  经济数学基础  计算机应用基础
     this.couseTitle = courseCodeOrTitle || this.couseTitle
@@ -706,27 +721,31 @@ class BotPlus {
       let bybase = [ '国家开放大学学习指南','思想道德修养与法律基础','马克思主义基本原理概论','毛泽东思想和中国特色社会主义理论体系概论','中国特色社会主义理论体系概论','习近平新时代中国特色社会主义思想', '中国近现代史纲要']
       
       if (bybase.includes(title)) {
-        this.courseInfo = await parseCouseBase(cousePage)
+        this.couseInfo = await parseCouseBase(cousePage)
       } else{
-        this.courseInfo = await parseCouseBase(cousePage)
+        this.couseInfo = await parseCouseBase(cousePage)
       }
 
       let position = 0;
-      for (let i = 0; i < this.courseInfo.status.length; i++) {
-        if (this.courseInfo.status[i].type == 'quiz') {
-          this.courseInfo.status[i].position = position;
+      for (let i = 0; i < this.couseInfo.status.length; i++) {
+        if (this.couseInfo.status[i].type == 'quiz') {
+          this.couseInfo.status[i].position = position;
           position++;
         }
       }
 
       // let endAt = new Date()
-      // this.courseInfo.score.startAt = startAt
-      // this.courseInfo.score.endAt = endAt
+      // this.couseInfo.score.startAt = startAt
+      // this.couseInfo.score.endAt = endAt
       await this.saveCouseJson(this.couseTitle)
-      await cousePage.close();
+      // 无需关闭，每次driver都用第一个tab打开，如果关闭，browser会关闭
+      // await cousePage.close();
     } else {
       console.debug(`课程代码 ${ this.couseTitle} ${courseCodeOrTitle} 找不到课程url`);
     }
+    console.log( "============= profileCouse1 =============")
+
+    return this.couseInfo
   }
 
   async getCousesLinks(mainPage, couseTitle) {
@@ -747,7 +766,9 @@ class BotPlus {
         let buttonElement = await couse.$('.course-entry button');
         //let text =  await couse.$eval('.course-entry button', node=>node.innerText );
         //   title="★中级财务会计（一）"  couseTitle = "中级财务会计（一）"
+        //   "Photoshop图像处理".toLowerCase() => "photoshop图像处理"
 
+        title = title.toLowerCase()
         console.debug("getCousesLinks couse=", title, title.includes(couseTitle));
         if (title.includes(couseTitle)) {
           links.push(buttonElement)
@@ -766,9 +787,9 @@ class BotPlus {
 
   async saveCouseJson(classId) {
     let filename = await this.getCouseJsonPath(classId)
-    //console.log('this.courseInfo----:',this.courseInfo);
+    //console.log('this.couseInfo----:',this.couseInfo);
     // 保存 课程信息时只保存status 即每一课的信息，以便和快速开视频使用相同的结构的文件
-    fs.writeFileSync(filename, JSON.stringify(this.courseInfo.status) );
+    fs.writeFileSync(filename, JSON.stringify(this.couseInfo.status) );
   }
 
   async getCouseJsonPath(couseTitle) {
@@ -793,45 +814,44 @@ class BotPlus {
         code
       } = couse
 
+      let fullname = `${title}_${code}`
       if (title == '习近平新时代中国特色社会主义思想') {
         jsonStr = answerList.makeXiAnswerJson("./db/answers/xi.txt")
-        filename = './db/answers/' + code + '_xiList.json'
+        filename = `./db/answers/${fullname}.json`
       } else if (title == '国家开放大学学习指南') {
         let answerList = new AnswerList()
         jsonStr = answerList.makeZhiNanAnswerJson("./db/answers/zhinan.txt")
-        filename = './db/answers/' + code + '_zhinanList.json'
+        filename = `./db/answers/${fullname}.json`
       } else if (title == '思想道德修养与法律基础') {
         let answerList = new AnswerList()
         jsonStr = answerList.makeSiXiuAnswerJson("./db/answers/sixiu.txt")
-        filename = './db/answers/' + code + '_sixiuList.json'
+        filename = `./db/answers/${fullname}.json`
       } else if (title == '毛泽东思想和中国特色社会主义理论体系概论') {
         let answerList = new AnswerList()
         jsonStr = answerList.makeMaoAnswerJson("./db/answers/mao.txt")
-        filename = './db/answers/' + code + '_maoList.json'
+        filename = `./db/answers/${fullname}.json`
       } else if (title == '马克思主义基本原理概论') {
         let answerList = new AnswerList()
         jsonStr = answerList.makeMaoAnswerJson("./db/answers/makesi.txt")
-        filename = './db/answers/' + code + '_makesiList.json'
+        filename = `./db/answers/${fullname}.json`
       } else if (title == '中国近现代史纲要') {
         let answerList = new AnswerList()
         jsonStr = answerList.makeJinDaiShiAnswerJson("./db/answers/jindaishi.txt")
-        filename = './db/answers/' + code + '_jindaishiList.json'
+        filename = `./db/answers/${fullname}.json`
       } else {
         // 可能答案文件不存在，无法生成
         let answerList = new AnswerList()
-        let answerfile = `./db/answers/${code}_${title}.txt`
+        let answerfile = `./db/answers/${fullname}.txt`
         if( fs.existsSync( answerfile)){
           jsonStr = answerList.makeAnswerJsonBase()
-          filename = `./db/answers/${code}_${title}.json`            
+          filename = `./db/answers/${fullname}.json`            
         }
       }
       if (filename ) {
-        fs.writeFile(filename, JSON.stringify({
+        console.log( "课程测验答案",filename)
+        fs.writeFileSync(filename, JSON.stringify({
           answers: jsonStr
-        }), (err) => {
-          if (err) throw err;
-          console.log(`课程测验答案已被保存:${filename}`);
-        });
+        }));
       } else {
         console.log(`没有课程测验答案:${couseTitle}`);
       }
@@ -914,6 +934,32 @@ class BotPlus {
     let couse = CouseUrlMap[couseTitle]
     return couse
   }
+
+  /**
+   * 
+   * @param {*} couseTitle 
+   * @param {*} filename 
+   */
+  async loadCouseFile(couseTitle, filename ) {
+     
+    this.couseTitle = couseTitle
+         
+    if (fs.existsSync(filename)) {
+      let data = fs.readFileSync(filename, "utf-8")
+      if (data != null) {
+
+        let res = JSON.parse(data);
+        console.info(`读取课程数据 ${couseTitle}`);
+        this.courseInfo.status = res;
+      }
+    } else {
+      logger.error(`无法读取课程数据文件 ${filename}`);
+      filename = null
+    }
+
+    return filename
+  }
+
 }
 
 

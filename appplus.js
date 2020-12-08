@@ -27,7 +27,8 @@ const {
   handleLearnFinal,
   handleGenSubject,
   handleGenAccounts,
-  handleGenQuiz
+  handleGenQuiz,
+  simpleLearn
 } = require('./src/indexplus')
 
 // example: node app.js -- createlog 4255 #毛泽东思想和中国特色社会主义理论体
@@ -71,6 +72,20 @@ program.command('createModuleFile <course>')
     fs.writeFileSync(saveFilename, JSON.stringify(moduleids))
 
     
+  })
+
+program.command('simplelearn')
+  .description('simple learn')
+  .action(async function( ) {
+    if (!isAvaible()) {
+      console.log("软件出现问题，请联系开发人员！")
+      return
+    }
+    let type = ( program.type || null)
+    let options = { type: type }
+    let accounts = await getAccounts()  
+       
+    await simpleLearn(accounts, options)
   })
 
 program.command('lcourse <course>')
@@ -397,7 +412,8 @@ console.log( 'accountfile=', accountfile)
   // trim
   accounts.forEach((acc)=>{
     if( acc.subject ){
-      acc.subject = acc.subject.trim()
+      // 清除空格，字母小写便于比较
+      acc.subject = acc.subject.trim().toLowerCase()
     }
   })
   return accounts

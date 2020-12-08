@@ -1,4 +1,3 @@
-// import util from './src/util.js'
 const fs = require('fs');
 const path = require('path');
 const stringify = require('csv-stringify')
@@ -13,6 +12,11 @@ const {
   BotPlus,  
 } = require('./botplus.js');
 
+const {
+  getAccount,  
+  addAccount
+} = require('./db.js');
+
 const Bot =  BotPlus
 const { PuppeteerDriver } = require( './puppeteer.js')
 
@@ -23,6 +27,7 @@ const {
   until
 } = require('selenium-webdriver');
 
+const GenCouseError = { }; // code => false
 // 检查登录账户是否可用
 async function handleAccountsCheckin(  accounts=[] ) {
 
@@ -239,7 +244,7 @@ async function handleLearnCourses(accounts=[] , options = {}) {
         let log = await bot.getLog( courseCode)
         if( log ){
           console.error("开始学习课程："+ courseCode )
-          await bot.learnCourse(options)
+          await bot.learnCouse(options)
         }else{
           //throw  new Error( "用户名和密码是必须的")
           console.error("没有找到课程数据文件："+ courseCode )
@@ -263,7 +268,7 @@ async function handleLearnCourse(courseCode, username, password) {
   if( log ){
     await bot.login(username, password)
     await bot.prepareForLearn(courseCode)
-    await bot.learnCourse()
+    await bot.learnCouse()
   }else{
     console.error("没有找到课程数据文件："+ courseCode )
   }
@@ -415,6 +420,94 @@ async function handleGenQuiz(accounts){
   }
   await driver.quit()
 }
+
+/**
+ * 学习账号文件中的课程，只需提供账号，密码，课程名称
+ * @param {Array} accounts { username, password, subject: 课程名称 }
+ * @param {Object} options { type: video }
+ */
+
+async function simpleLearn(accounts, options={}) {
+  let driver = new PuppeteerDriver();
+  let { type } = options
+  let bot = new Bot(driver )
+  console.debug("开始学习小节, 人数=", accounts.length)
+
+  for (let i = 0; i < accounts.length; i++) {
+    let account = accounts[i]
+    let { username, password, subject} = account
+    
+    console.debug(  username, password, subject )
+    if( !username || !password || !subject){
+      continue
+    }
+    // 课程信息 { code, title, url, host }
+    let couseInfo = null;
+    // 课程数据文件信息
+    let sujectFileInfo = { success: false};
+    
+    // 1. 检查登录是否成功
+    let islogin = await bot.login( username, password )
+    
+    // 2. 检查课程是否存在，查询课程代码
+    if( islogin){
+      couseInfo = await bot.prepareForLearn(subject)
+
+    }
+    console.log( "simpleLearn 2. 检查课程是否存在，查询课程代码 ", couseInfo)
+    // 课程代码在前，内部使用，作为课程文件命名
+
+    
+    // 3. 根据课程代码，查询课程数据文件
+
+    if ( couseInfo ){ 
+      // {success, path }
+      let couseFullname = `${couseInfo.title}_${couseInfo.code}`
+      let subjectfile = `./db/subjects/${couseFullname}.json`
+      let isexist =  fs.existsSync(subjectfile )
+
+      subjectFileInfo = await produceSubjectFile( bot, couseInfo )
+      
+      console.log( "simpleLearn 3.  根据课程代码，查询课程数据文件 ", sujectFileInfo)
+    }
+    let {success, path} = subjectFileInfo ; // 课程数据文件是否存在
+
+    if( success){
+      // 如果存在需要加载课程数据
+      console.log( "simpleLearn 3.1  需要加载课程数据 ", path)
+      await bot.getLog( couseInfo.title, { filename: path } )
+    }
+    // 4. 查询用户账号数据文件，查询当前用户当前课程进度
+    // 
+    let accountInfo = getAccount( username )
+    console.log( "simpleLearn 4.0  查询当前用户当前课程进度 ", accountInfo)
+
+    if( accountInfo == null ){
+      accountInfo = { username, password, subject, islogin: islogin, isexist:isexist, code: couseInfo.code, videodone: false, quizdone: false, videoModule: 0, quizModule: 0 }
+    }
+    console.log( "simpleLearn 4.1  查询当前用户当前课程进度 ", accountInfo)
+    // 如果当前课程可以学习
+    // 5. 学习视频，并保存进度
+    // if( ( type == null || type=='video') && !accountInfo.videodone ){
+    //   await bot.learnCouse({ type: 'video' })
+    //   accountInfo.videodone = true
+    // }
+    // // 6. 学习单元测试，并保存进度
+    if( ( type == null || type=='quiz') && !accountInfo.quizdone ){
+      await bot.learnCouse({ type: 'quiz' })
+      accountInfo.quizdone = true
+    }
+
+    // 7. 学习终结性考试，并保存进度
+     
+    // 8. 保存账号数据
+    addAccount( accountInfo )
+    await bot.logout()
+
+  }
+  await driver.quit()
+}
+
 
 async function saveUserJson(username, userInfo) {
   let filename =  './db/students/' + username  + '.json'
@@ -586,6 +679,66 @@ async function handleGenAccounts( accounts ){
   })
 }
 
+
+/**
+ * 根据课程信息生成课程数据文件
+ * @param {*} couseInfo 
+ * @returns {} { success, msg, error }  - 是否成功
+ */
+async function produceSubjectFile(bot, couseInfo){
+  console.log( "============= produceSubjectFile0 =============")
+
+        // 课程代码在前，内部使用，作为课程文件命名
+        let couseFullname = `${couseInfo.title}_${couseInfo.code}`
+        let subjectfile = `./db/subjects/${couseFullname}.json`
+        let gencouse = true
+        isexist =  fs.existsSync(subjectfile )
+        // 如果文件存在则跳过
+        iserror = GenCouseError[couseInfo.code] === false
+        
+        if( !isexist && !iserror){
+          let couseName = couseInfo.title
+          let couseDetail = await bot.profileCouse(couseName).catch((e)=>{
+            console.error( "profileCouse error", e)
+            gencouse = false
+            GenCouseError[couseInfo.code] = false
+          })
+  console.log( "produceSubjectFile: 解析课程", couseName, gencouse )
+          if( gencouse ){
+            await bot.createAnswerList(couseName)
+      
+            for( let i=0;i< couseDetail.status.length; i++){
+              couseDetail.status[i].isFinish='未完成'
+            }
+            fs.writeFileSync(subjectfile, JSON.stringify(couseDetail.status) );
+        
+            let moduleType = 'video'
+            
+            // 2.1 创建视频数据文件
+            createModuleFile( couseFullname, moduleType )
+            // 2.2 创建测单元验数据文件
+            moduleType = 'quiz'
+            createModuleFile( couseFullname, moduleType )
+            // 2.3 创建文章数据文件
+            moduleType = 'page'
+            createModuleFile( couseFullname, moduleType )
+        
+            // 3. 创建可执行文件, 文件的最后4个字符为课程号，
+            let couseFullname2 = `${couseInfo.title}_${couseInfo.code}`
+            createBinFile(couseFullname2)
+        
+            // 4. 添加课程数据到indexdb.json
+            addCouseIntoDb( couseInfo.code, couseInfo.title )
+          }
+  
+        }
+        console.log( "============= produceSubjectFile1 =============")
+
+      return { success: gencouse,  msg: null, path: subjectfile }
+}
+  
+ 
+
 // couseFullname: 4065_习近平新时代中国特色社会主义思想
 // moduleType: video, text
 function createModuleFile( couseFullname, moduleType ){
@@ -619,6 +772,10 @@ function createBinFile(couseFullname){
 
 }
 
+
+
+
+// 添加课程数据到课程数据库
 function addCouseIntoDb(code, title){
 
   let dbfile = `./db/subjects/indexdb.json`
@@ -630,6 +787,8 @@ function addCouseIntoDb(code, title){
   fs.writeFileSync(dbfile, JSON.stringify(records))
 
 }
+
+
 
 module.exports = {
   handleAccountsCheckin,
@@ -646,5 +805,6 @@ module.exports = {
   handleLearnFinal,
   handleGenSubject,
   handleGenAccounts,
-  handleGenQuiz
+  handleGenQuiz,
+  simpleLearn
 }

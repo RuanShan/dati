@@ -238,7 +238,7 @@ async function handleLearnCourses(accounts=[] , options = {}) {
         let log = await bot.getLog( courseCode)
         if( log ){
           console.error("开始学习课程："+ courseCode )
-          await bot.learnCourse(options)
+          await bot.learnCouse(options)
         }else{
           //throw  new Error( "用户名和密码是必须的")
           console.error("没有找到课程数据文件："+ courseCode )
@@ -262,7 +262,7 @@ async function handleLearnCourse(courseCode, username, password) {
   if( log ){
     await bot.login(username, password)
     await bot.prepareForLearn(courseCode)
-    await bot.learnCourse()
+    await bot.learnCouse()
   }else{
     console.error("没有找到课程数据文件："+ courseCode )
   }

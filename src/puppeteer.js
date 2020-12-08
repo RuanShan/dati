@@ -65,10 +65,13 @@ class PuppeteerDriver {
     }else{
       newPage = pages[0]
     }
+    console.log( '准备打开：', url )
     
     await Promise.all( [ newPage.goto(url, PAGE_PUPPETEER_OPTS), newPage.waitForNavigation()]).catch(async e=>{
-      // 试试重新加载  
-      await newPage.reload()
+      // 试试重新加载, 不能使用reload， 这样页面并不是新页面
+      console.error( '无法打开：', url )
+      await newPage.goto(url, PAGE_PUPPETEER_OPTS)
+      
     });
     return newPage
   }
