@@ -33,6 +33,11 @@ node app.js  --account=account.json --type=quiz --submitquiz=yes lmodules 3945
 
 0. node app.js  --account=db/courses.csv gensubject
 0. node app.js  --account=account.json genaccount
+# 学习答题
+0. node appplus.js  --account=db/courses.csv --type=quiz --submitquiz=yes  simplelearn
+# 生成测试题库
+0. node appplus.js  --account=--account=db/20201126a.csv  genquiz
+ 
 ### TODO
 1. 添加功能，给定格式文件 生成这个课程的内容数据文件
 2. 添加功能，给定格式文件 生成这个课程的所有答案文件

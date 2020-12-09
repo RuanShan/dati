@@ -141,14 +141,14 @@ async function handle503( page, url, delay=10000){
 }
 
 
-async function handleDelay( page, delay = 300 ){
+async function handleDelay( delay = 500 ){
 
-  await  page.waitForFunction( function(){
+   
     return new Promise((resolve, reject) => {
-      console.error("ensureButton 延时300ms" )
-      setTimeout(()=>{ resolve(true)}, 300);
+      console.error("  延时500ms" )
+      setTimeout(()=>{ resolve(true)}, delay);
     })
-  });
+   
 }
 
 

@@ -429,7 +429,7 @@ async function handleGenQuiz(accounts){
 
 async function simpleLearn(accounts, options={}) {
   let driver = new PuppeteerDriver();
-  let { type, submitquiz } = options
+  let { type, submitquiz, submitfinal } = options
   let bot = new Bot(driver )
   console.debug("开始学习小节, 人数=", accounts.length)
 
@@ -483,27 +483,39 @@ async function simpleLearn(accounts, options={}) {
     console.log( "simpleLearn 4.0  查询当前用户当前课程进度 ", accountInfo)
 
     if( accountInfo == null ){
-      accountInfo = { username, password, subject, islogin: islogin, isexist:isexist, code: couseInfo.code, videodone: false, quizdone: false, videoModule: 0, quizModule: 0 }
+      accountInfo = { username, password, subject, islogin: islogin, isexist:isexist, code: couseInfo.code, videodone: false, quizdone: false, pagedone: false, finaldone: false }
     }
     console.log( "simpleLearn 4.1  查询当前用户当前课程进度 ", accountInfo)
     // 如果当前课程可以学习
-    // 5. 学习视频，并保存进度
+    // 5.1 学习单元测试，并保存进度
+    // if( ( type == null || type=='page') && !accountInfo.pagedone ){
+    //   await bot.learnCouse({ type: 'page' })
+    //   accountInfo.pagedone = true
+    //   addAccount( accountInfo )      
+    // }
+    // 5.2 学习视频，并保存进度
     if( ( type == null || type=='video') && !accountInfo.videodone ){
       await bot.learnCouse({ type: 'video' })
       accountInfo.videodone = true
       addAccount( accountInfo )
     }
-    // // 6. 学习单元测试，并保存进度
-    if( ( type == null || type=='quiz') && !accountInfo.quizdone ){
-      await bot.learnCouse({ type: 'quiz' })
-      if( submitquiz == 'yes'){
-        accountInfo.quizdone = true
+    // 5.3 学习单元测试，并保存进度
+    // if( ( type == null || type=='quiz') && !accountInfo.quizdone ){
+    //   await bot.learnCouse({ type: 'quiz' })
+    //   if( submitquiz == 'yes'){
+    //     accountInfo.quizdone = true
+    //     addAccount( accountInfo )
+    //   }
+    // }
+
+    // 7. 学习终结性考试，并保存进度
+    if( ( type == null || type=='final') && !accountInfo.finaldone ){
+      await bot.learnFinal( { submitfinal } )
+      if( submitfinal == 'yes'){
+        accountInfo.finaldone = true
         addAccount( accountInfo )
       }
     }
-
-    // 7. 学习终结性考试，并保存进度
-     
     // 8. 保存账号数据
   
     await bot.logout()

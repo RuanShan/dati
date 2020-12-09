@@ -11,6 +11,7 @@ const fs = require('fs');
 const {answers} = require ('../../db/answers/xiList.json');
 const { handle503, handleDelay} = require ('../utilplus');
 
+let recursiveCount = 0
 /**
  * 分析课程章节数据
  * @param {*} page 
@@ -315,17 +316,33 @@ async function copyOneQuiz( page,  isFirstPage, url ){
  * @param {*} num - 考试在所有考试中的index
  */
 async function handleQuizBase( driver, url,  options, answsers, num){
+  
+
   let startButtonSelector="div.quizstartbuttondiv button[type=submit]"
 
-  let page = await driver.get( url )
+  let page = null
+  page = await driver.get( url )
   await handle503(page, url);
 
-    await page.waitForSelector(startButtonSelector);
-    let button = await  page.$(startButtonSelector)
+  await page.waitForSelector(startButtonSelector);
+  let button = await page.$(startButtonSelector)
 
-    await Promise.all( [page.waitForNavigation(), button.click()]) // 进入测试页面
-
+  let navSuccess = true
+  // 进入测试页面
+  await Promise.all( [page.waitForNavigation(), button.click()]).catch(async e=>{
+    // 试试重新加载, 不能使用reload， 这样页面并不是新页面
+    console.error( '答题页面打开超时...', e)
+    navSuccess = false
+      
+  }); 
+  if( navSuccess ){
+    recursiveCount = 0
     await processOneQuiz( page,answsers, num, options )
+  }else{
+    recursiveCount += 1
+    console.log( '答题页面打开超时 递归调用 handleQuizBase... ', navSuccess, recursiveCount)
+    await handleQuizBase( driver, url,  options, answsers, num)
+  }
 }
 
 /**
@@ -339,7 +356,7 @@ async function handleQuizBase( driver, url,  options, answsers, num){
  * @param {*} answsers 
  */ 
 async function processOneQuiz( page, answsers,  num, options){
-  console.log('====================handleQuizBase================');
+  console.log('====================processOneQuiz================');
 
   //let queXpath = "//div[@class='que truefalse deferredfeedback notyetanswered']"
   let queSelector = ".que"
@@ -372,6 +389,7 @@ async function processOneQuiz( page, answsers,  num, options){
       level_1=keyWords1.indexOf(question[0]);
       continue;
     }
+    console.log(`answsers[${num}][${level_1}][${keynum}]:`);
     let key = answsers[num][level_1][keynum]
     console.log('key---:',key);
 
@@ -415,9 +433,9 @@ async function processOneQuiz( page, answsers,  num, options){
     await processOneQuiz( page,answsers,num, options)
   }else if(submitPage){
     console.log('=======has submitPage=======');
-    await submitPage.click()
-    // 提交后等 300ms，以免切换页面后，内容返回，导致新页面内容不正确
-    await  handleDelay( page );
+    await Promise.all([  page.waitForNavigation(), submitPage.click()])
+    // 提交后等 300ms，以免切换页面后，内容返回，导致新页面内容不正确, 因为ajax 所以 waitForNavigation 不起作用
+    await  handleDelay(   );
 
   }
 
@@ -436,10 +454,10 @@ async function processOneQuiz( page, answsers,  num, options){
 
     const ensureButton = await page.$$('.confirmation-dialogue input.btn-primary')
     console.log('ensureButton-----:',ensureButton.length);
-    await ensureButton[0].click()
+    await Promise.all([  page.waitForNavigation(), ensureButton[0].click()])
 
     // 提交后等 300ms，以免直接切换页面，请求没有发到服务器端？
-    await  handleDelay( page );
+    await  handleDelay(  );
   }
 }
  

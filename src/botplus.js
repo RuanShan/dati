@@ -8,7 +8,7 @@ const {
   getCourseNameByCode,
   scrollToBottom,
   playVideo
-} = require('./util')
+} = require('./utilplus')
 const fs = require('fs');
 const URL = require('url');
 
@@ -425,7 +425,7 @@ class BotPlus {
       if (title == '习近平新时代中国特色社会主义思想') {
         await handleQuizBase(driver, url, options, answsers, num )
       } else if (title == '国家开放大学学习指南') {
-        await handleZhiNanQuiz(driver, url, id, num, true, options, answsers)
+        await handleQuizBase(driver, url, options, answsers, num )
       } else if (title == '思想道德修养与法律基础') {
         await handleQuizBase(driver, url, options, answsers, num )
       } else if (title == '毛泽东思想和中国特色社会主义理论体系概论') {
@@ -451,35 +451,43 @@ class BotPlus {
     let id = lesson.id
     let url = lesson.url
     let classId = lesson.classId
-    let finalFilename = getCourseNameByCode( classId )
 
-    await driver.get(url)
-    await driver.wait(until.elementLocated(By.css('.singlebutton button.btn-secondary')), 15000);
-    const commitButton = await driver.findElement(By.css('.singlebutton button.btn-secondary'))
+    
+    let page = await driver.get(url)
+
+    await page.waitForSelector( '.singlebutton button.btn-secondary');
+    const commitButton = await page.$( '.singlebutton button.btn-secondary')
     await commitButton.click()
     console.debug("编辑按钮")
 
-    await driver.wait(until.elementLocated(By.css('iframe')), 15000);
-    const textBody = await driver.findElement(By.css('iframe'))
+    await page.waitForSelector('iframe') ;
+    const textBody = await page.$('iframe')
 
-    let answerText = fs.readFileSync(`./db/subjects/${finalFilename}_final.txt`,'utf8')
-    textBody.sendKeys(Key.CONTROL, "a", Key.NULL,answerText);
+    let fullname = `${this.couseTitle}_${classId}`
+    let answerText = fs.readFileSync(`./db/subjects/${fullname}_final.txt`,'utf8')
 
-    await driver.wait(until.elementLocated(By.css('.form-group input.btn-primary')), 15000);
-    const saveButton = await driver.findElement(By.css('.form-group input.btn-primary'))
+    await textBody.focus();
+    await page.keyboard.down('Control');
+    await page.keyboard.press('KeyA');
+    await page.keyboard.up('Control');
+    await page.keyboard.press('Delete');
+    await textBody.type( answerText )
+
+    await page.waitForSelector('.form-group input.btn-primary');
+    const saveButton = await page.$('.form-group input.btn-primary')
     await saveButton.click()
 
     // 点击提交按钮
     if( options.submitfinal == 'yes'){
       let submitButtonCss = '.submissionaction:last-child form button.btn-secondary'
-      await driver.wait(until.elementLocated(By.css(submitButtonCss)), 15000);
+      await page.waitForSelector(submitButtonCss);
       console.debug("查找提交按钮")
-      const submitButton = await driver.findElement(By.css(submitButtonCss))
+      const submitButton = await page.$(submitButtonCss)
       await submitButton.click()
       console.debug("点击提交按钮")
       let confirmButtonCss = '.submitconfirm #id_submitbutton'
-      await driver.wait(until.elementLocated(By.css(confirmButtonCss)), 15000);
-      const confirmButton = await driver.findElement(By.css(confirmButtonCss))
+      await page.waitForSelector(confirmButtonCss);
+      const confirmButton = await page.$( confirmButtonCss )
       await confirmButton.click()
       console.debug("点击确认按钮")
     }
@@ -545,7 +553,8 @@ class BotPlus {
       host
     } = CouseUrlMap[couseTitle]
 
-    let filename = `db/subjects/${code}_${title}.json`
+    let fullname = `${title}_${code}`
+    let filename = `db/subjects/${fullname}.json`
     // 加载课程数据文件
     this.getLog( couseTitle, { filename } )
     
@@ -557,7 +566,7 @@ class BotPlus {
     let quizArray = await copyQuizBase( this.driver, urlbase, lessons )
 
       // 生成试题文件
-    let answerfile = `db/answers/${code}_${title}.txt`
+    let answerfile = `db/answers/${fullname}.txt`
 
     let answerStr = ''
     let LE =  "\r\n"
@@ -661,9 +670,7 @@ class BotPlus {
 
   async learnFinal(options) {
 
-     
 
-    let driver = this.driver
     let moduleStatus = this.couseInfo.status
 
     for (let i = 0; i < moduleStatus.length; i++) {
@@ -789,7 +796,7 @@ class BotPlus {
     let filename = await this.getCouseJsonPath(classId)
     //console.log('this.couseInfo----:',this.couseInfo);
     // 保存 课程信息时只保存status 即每一课的信息，以便和快速开视频使用相同的结构的文件
-    fs.writeFileSync(filename, JSON.stringify(this.couseInfo.status) );
+    //fs.writeFileSync(filename, JSON.stringify(this.couseInfo.status) );
   }
 
   async getCouseJsonPath(couseTitle) {
