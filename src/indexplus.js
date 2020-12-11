@@ -190,7 +190,7 @@ async function handleReadScore(courseCode, username, password){
 }
 
 // 取得课程进度
-async function handleGetCourseSumaries(accounts, courseCodes ){
+async function handleGetCourseSumaries(accounts ){
   let driver = new PuppeteerDriver();
   let bot = new Bot(driver)
   console.log(" bot doing handleSumaryCourses")
@@ -488,11 +488,11 @@ async function simpleLearn(accounts, options={}) {
     console.log( "simpleLearn 4.1  查询当前用户当前课程进度 ", accountInfo)
     // 如果当前课程可以学习
     // 5.1 学习单元测试，并保存进度
-    // if( ( type == null || type=='page') && !accountInfo.pagedone ){
-    //   await bot.learnCouse({ type: 'page' })
-    //   accountInfo.pagedone = true
-    //   addAccount( accountInfo )      
-    // }
+    if( ( type == null || type=='page') && !accountInfo.pagedone ){
+      await bot.learnCouse({ type: 'page' })
+      accountInfo.pagedone = true
+      addAccount( accountInfo )      
+    }
     // 5.2 学习视频，并保存进度
     if( ( type == null || type=='video') && !accountInfo.videodone ){
       await bot.learnCouse({ type: 'video' })
@@ -500,21 +500,20 @@ async function simpleLearn(accounts, options={}) {
       addAccount( accountInfo )
     }
     // 5.3 学习单元测试，并保存进度
-    // if( ( type == null || type=='quiz') && !accountInfo.quizdone ){
-    //   await bot.learnCouse({ type: 'quiz' })
-    //   if( submitquiz == 'yes'){
-    //     accountInfo.quizdone = true
-    //     addAccount( accountInfo )
-    //   }
-    // }
-
-    // 7. 学习终结性考试，并保存进度
-    if( ( type == null || type=='final') && !accountInfo.finaldone ){
-      await bot.learnFinal( { submitfinal } )
-      if( submitfinal == 'yes'){
-        accountInfo.finaldone = true
+    if( ( type == null || type=='quiz') && !accountInfo.quizdone ){
+      await bot.learnCouse({ type: 'quiz' })
+      if( submitquiz == 'yes'){
+        accountInfo.quizdone = true
         addAccount( accountInfo )
       }
+    }
+
+    // 7. 学习终结性考试，并保存进度
+    console.log( "simpleLearn 7  学习终结性考试 ", submitfinal)
+    if( ( type == null || type=='final') && !accountInfo.finaldone ){
+      await bot.learnFinal( { submitfinal:submitfinal } )       
+        accountInfo.finaldone = true
+        addAccount( accountInfo )      
     }
     // 8. 保存账号数据
   
@@ -740,8 +739,8 @@ async function produceSubjectFile(bot, couseInfo){
             createModuleFile( couseFullname, moduleType )
         
             // 3. 创建可执行文件, 文件的最后4个字符为课程号，
-            let couseFullname2 = `${couseInfo.title}_${couseInfo.code}`
-            createBinFile(couseFullname2)
+            //let couseFullname2 = `${couseInfo.title}_${couseInfo.code}`
+            //createBinFile(couseFullname2)
         
             // 4. 添加课程数据到indexdb.json
             addCouseIntoDb( couseInfo.code, couseInfo.title )

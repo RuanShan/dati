@@ -7,7 +7,8 @@ const {
 const {
   getCourseNameByCode,
   scrollToBottom,
-  playVideo
+  playVideo,
+  handleDelay
 } = require('./utilplus')
 const fs = require('fs');
 const URL = require('url');
@@ -361,10 +362,11 @@ class BotPlus {
       let url = lesson.url
       let title = lesson.title
 
-      await driver.get(url);
-      console.debug('reading ', title);
-      await driver.wait(scrollToBottom(driver), 100000000);
-      console.debug('read finish', title);
+      let page = await driver.get(url);
+      console.debug(`before reading ${ title}`);
+      await scrollToBottom(page)
+      
+      console.debug(`after reading${ title}`);
 
     }
 
@@ -464,7 +466,18 @@ class BotPlus {
     const textBody = await page.$('iframe')
 
     let fullname = `${this.couseTitle}_${classId}`
-    let answerText = fs.readFileSync(`./db/subjects/${fullname}_final.txt`,'utf8')
+
+    let answerText = "";
+    let filepath = `./db/subjects/${fullname}_final.txt`
+    if( fs.existsSync( filepath )){
+      filepath = `./db/subjects/final/${this.couseTitle}.txt`
+      answerText = fs.readFileSync(filepath,'utf8')
+
+    }else{
+      filepath = `./db/subjects/final/${this.couseTitle}.txt`
+      answerText = fs.readFileSync(filepath,'utf8')
+
+    }
 
     await textBody.focus();
     await page.keyboard.down('Control');
@@ -517,17 +530,14 @@ class BotPlus {
         // puppeteer 不支持video，这里获取div#video. 直接执行ajax
         let video = await page.waitForSelector('#video');
         let script = `jQuery.ajaxSetup({ async : false}); var res = null; jQuery.getJSON('/theme/blueonionre/modulesCompletion.php?cmid=${id}&id=${classId}&sectionid=${sectionId}', function(data){ res = data; }); ;`
+        // "视频播放延时1秒, 防止API没有成功！"
         let res = await page.evaluate(script);
-        await  page.waitForFunction(  function(){
-          return new Promise((resolve, reject) => {
-            console.error("视频播放延时1秒, 防止API没有成功！" )
-            setTimeout(()=>{ resolve(true)}, 1000);
-          })
-        });
+        await handleDelay(500);
+         
         console.log('视频播放成功', typeof(res), res);
       } catch (ex) {
         success = false
-        logger.error(`视频播放失败：${this.username} ${id}`);
+        logger.error(`视频播放失败：${this.username} ${id} ${ex}`);
         console.error('视频播放失败：' + id, ex);
       }
     }
@@ -670,13 +680,15 @@ class BotPlus {
 
   async learnFinal(options) {
 
+    console.log( "============= learnFinal =============")
+    console.log( "this.couseInfo.status", this.couseInfo.status.length)
 
     let moduleStatus = this.couseInfo.status
 
     for (let i = 0; i < moduleStatus.length; i++) {
       let lesson = moduleStatus[i];
 
-      if (lesson.title == '终结性考试' && lesson.type =='assign') {
+      if ((lesson.title == '终结性考试' || lesson.title == '大作业')&& lesson.type =='assign') {
         await this.goFinal(lesson, options)
       }
     }
@@ -786,7 +798,6 @@ class BotPlus {
       logger.error(`无法读取课程链接 ${this.username} ${this.password} ${couseTitle}`);
       let path = `./db/log/${couseTitle}_${this.username}.jpg`
       await mainPage.screenshot({type: 'jpeg', path: path})
-
     }
     // 不知因为什么原因会多一个, 可能是angular生成的隐藏button对象，
     return links
@@ -872,26 +883,29 @@ class BotPlus {
   // 取得科目的形考成绩
   async getSummary(couseTitles) {
     let driver = this.driver
+
     let summaries = []
-    await driver.wait(until.elementLocated(By.id('zaixuekecheng')));
-    let div = await driver.findElement(By.id('zaixuekecheng'));
-    let couses = await driver.findElements(By.css('#zaixuekecheng .media'));
+    let url = 'http://student.ouchn.cn/'
+    let page = await driver.get( url )
+     await page.waitForSelector( '#zaixuekecheng');
+    let div = await page.$( '#zaixuekecheng');
+    let couses = await page.$$( '#zaixuekecheng .media' );
     console.debug("getSummary couses=", couses.length);
     for (let i = 0; i < couses.length; i++) {
       let couse = couses[i]
-      let titleElement = await couse.findElement(By.css('.media-title'));
-      let title = await titleElement.getText()
-      let buttonElement = await couse.findElement(By.css('.course-entry button'));
-      let text = await buttonElement.getText()
+      let title = await couse.$eval( '.media-title', node => node.innerText);
+      
+      let text = await couse.$eval( '.course-entry button', node => node.innerText);
+
       // [必修6学分, 形考成绩: 99,本班排名: 3/12, 有43个作业和测验待完成]
 
       if (couseTitles.includes(title)) {
         let sumary = {
           title: title
         }
-        let infoElements = await couse.findElements(By.css('.course-content p'));
-        let todo = await infoElements[3].getText()
-        let score = await infoElements[1].getText()
+        let infoElementWrap = await couse.$('.course-content');
+        let todo = await infoElementWrap.$eval('p:nth-child(4)', node => node.innerText) // [3].getText()
+        let score = await infoElementWrap.$eval('p:nth-child(2)', node => node.innerText)
         sumary.username = this.username
         sumary.todo = todo
         sumary.score = score

@@ -35,10 +35,12 @@ const {
 const isNetwork = true
 
 program
-  .version('0.0.1')
+  .version('1.0.1')
+  .option('-c, --config <configfile>', 'config file')
   .option('-u, --username <username>', 'user name')
   .option('-p, --password <password>', 'user password')
   .option('-a, --account <accountfile>', 'account file')
+  .option('-b, --base <basepath>', 'base path')
   .option('-m, --modulefile <modulefile>', 'module file')
   .option('-s, --submitquiz <yes|no>', 'submit quiz  yes or no')
   .option('-f, --submitfinal <yes|no>', 'submit final  yes or no')
@@ -182,29 +184,33 @@ program.command('getcode [accountfile]')
 
   })
 // 根据网络数据，建立学习进度数据文件
-program.command('summary [accountfile]')
+program.command('summary')
   .description('summary all courses.')
-  .action(async function(accountfile) {
+  .action(async function() {
     if (!isAvaible()) {
       console.log("软件出现问题，请联系开发人员！")
       return
     }
     // 取得所有账户信息，取得每个账户的课程进度
-    let accounts = await getAccounts(accountfile)
-    console.log("get all course summary", accountfile, accounts.length)
+    let accounts = await getAccounts()
+    console.log("get all course summary", accounts.length)
     if( accounts.length> 0 ){
 
       let sumaries = await handleGetCourseSumaries(accounts )
 
       // 保存文件
-      let filename = `./db/summary-${(new Date).getTime()}.csv`
+      let basepath = program.base;
+      if( basepath ){
+        let filename = `${basepath}/summary-${(new Date).getTime()}.csv`
 
-      console.log( "before save to file:", filename  )
-      //fs.writeFileSync(filename, JSON.stringify(sumaries))
-      const csv = stringify(sumaries, {}, function(err, records){
-        fs.writeFileSync(filename, records)
-        console.log( "after save to file:", filename )
-      })
+        console.log( "before save to file:", filename  )
+        //fs.writeFileSync(filename, JSON.stringify(sumaries))
+        const csv = stringify(sumaries, {}, function(err, records){
+          fs.writeFileSync(filename, records)
+          console.log( "after save to file:", filename )
+        })
+      }
+
     }
 
 
@@ -379,6 +385,10 @@ program.parse(process.argv)
 if (program.username) console.log(`- ${program.username}`);
 if (program.password) console.log(`- ${program.password}`);
 
+async function loadConfig(){
+  // 
+}
+
 async function testBotplus(){
   let driver = new PuppeteerDriver
 
@@ -390,10 +400,7 @@ async function testBotplus(){
   await bot.profileCouse(subject)
 }
 
-async function getProgramAccounts( ){
-  
-} 
-
+ 
 async function getAccounts(accountfile=null) {
 
   if ( program.account ){

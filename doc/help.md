@@ -35,6 +35,8 @@ node app.js  --account=account.json --type=quiz --submitquiz=yes lmodules 3945
 0. node app.js  --account=account.json genaccount
 # 学习答题
 0. node appplus.js  --account=db/courses.csv --type=quiz --submitquiz=yes  simplelearn
+# 查成绩
+node appplus.js --account=bin/plus/accounts.csv --base=. summary
 # 生成测试题库
 0. node appplus.js  --account=--account=db/20201126a.csv  genquiz
  
@@ -83,3 +85,6 @@ node app.js  --type=video createModuleFile 4628_国家开放大学学习指南
 https://stackoverflow.com/questions/49538076/how-do-you-package-a-puppeteer-app
 
 xcopy node_modules\puppeteer\.local-chromium\win64-818858\chrome-win\ chromium /E /H /I
+
+
+https://stackoverflow.com/questions/59021700/passed-function-is-not-well-serializable

@@ -7,25 +7,26 @@ const {
 const fs = require('fs');
 
 const domain = 'ouchn.cn'
-async function scrollToBottom(driver) {
+async function scrollToBottom(page) {
 
-  let getScrollHeightScript = "return document.body.scrollHeight;"
-  let scrollHight = await driver.executeScript(getScrollHeightScript)
+  let getScrollHeightScript = "document.body.scrollHeight;"
+
+  let scrollHight = await page.evaluate(getScrollHeightScript)
   console.log("scrollHight=", scrollHight)
   // let script = "var h=document.body.scrollHeight; window.scrollTo(0,document.body.scrollHeight)"
   // 每秒500px
   // 需要检查路径是否在 http://anhui.ouchn.cn/ 下，animate可能不存在
-  let url = await driver.getCurrentUrl()
+  let url = await page.url()
   let script = 'var timespan = Math.ceil(document.body.scrollHeight/500)*1000; $("html,body").animate({scrollTop: document.body.scrollHeight + "px"}, timespan);'
   if( url.indexOf( domain )<0){
     script = 'var timespan = Math.ceil(document.body.scrollHeight/500)*1000; window.scrollTo(0,document.body.scrollHeight);'
   }
-  driver.executeScript(script)
+  await page.evaluate(script)
+  
   let delay = Math.ceil(parseInt(scrollHight) / 500) * 1000
 
-  return new Promise((resolve, reject) => {
-    setTimeout(resolve, delay);
-  })
+  await handleDelay( delay )
+   
 }
 
 function scrollToCenter(driver) {
@@ -145,7 +146,7 @@ async function handleDelay( delay = 500 ){
 
    
     return new Promise((resolve, reject) => {
-      console.error("  延时500ms" )
+      console.error(`  延时 ${delay} ms` )
       setTimeout(()=>{ resolve(true)}, delay);
     })
    
