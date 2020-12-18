@@ -52,34 +52,12 @@ const CouseUrlMap = {
 }
 
 
-const {
-  parseCouseMaoGai,
-  handleMaoGaiQuiz
-} = require('./couses/maogai')
-const {
-  parseCouseZhiNan,
-  handleZhiNanQuiz
-} = require('./couses/zhinan')
-const {
-  parseCouseSiXiu,
-  handleSiXiuQuiz
-} = require('./couses/sixiu')
-const {
-  parseCouseMao,
-  handleMaoQuiz
-} = require('./couses/mao')
-const {
-  parseCouseMaKeSi,
-  handleMaKeSiQuiz
-} = require('./couses/makesi')
-const {
-  parseCouseJinDaiShi,
-  handleJinDaiShiQuiz
-} = require('./couses/jindaishi')
+
 const {
   parseCouseBase,
   handleQuizBase,
-  copyQuizBase
+  copyQuizBase,
+  copyQuizBaseByReview
 } = require('./couses/baseplus')
 
 class BotPlus {
@@ -206,14 +184,18 @@ class BotPlus {
     let success = false
     //最多等待15秒
     try {
-      const [response] = await Promise.all([  page.waitForNavigation( ),  page.click(".login-form button[value='login']"),]);
+      const [response] = await Promise.all([  page.waitForNavigation( ),  page.click(".login-form button[value='login']") ]).catch(async (e)=>{
+        // 偶尔会没有重定向，需要重新请求一下
+        console.error( '未知问题登录失败，尝试再次打开http://student.ouchn.cn/')
+        await page.goto('http://student.ouchn.cn/')
+      });
       
       let url = await page.url()
 
       if(url.startsWith('http://passport.ouchn.cn')){
         logger.error(`登录失败 ${username}!!`);
       } else{
-        logger.info('登录成功!!');
+        console.info('登录成功!!');
         success = true
         await page.goto('http://student.ouchn.cn/')
       }
@@ -271,7 +253,8 @@ class BotPlus {
       if (typeFilter && typeFilter != type) {
         continue
       }
-      if (isFinish == '未完成') {
+      try{
+       
         let title = lesson.title
         logger.info(`学习小节${title} url=${url}`)
         let done = false
@@ -286,7 +269,7 @@ class BotPlus {
           isFinish = '完成'
         } else if (type == 'quiz') {
           // 只有类型为答题时，再答题，以免多次答题
-          if (typeFilter == type) {
+          if (typeFilter == type) {            
             await this.goQuiz(lesson, lesson.position, options)
             isFinish = '完成'
           }
@@ -298,6 +281,9 @@ class BotPlus {
         if (isFinish == '完成') {
           this.saveCouseJson(this.couseTitle)
         }
+      }catch(e){
+        console.error( `无法学习课程 ${lesson.title} url=${url} account=${this.username}`,e);
+        logger.error( `无法学习课程 ${lesson.title} url=${url} account=${this.username} `,e)
       }
     }
     //
@@ -336,6 +322,7 @@ class BotPlus {
         } else if (url.includes('/mod/page/view')) {
           await this.readText(lesson)
         } else if (type == 'quiz') {
+
           await this.goQuiz(lesson, lesson.position, options)
         } else {
           logger.error(`无法识别的课程url =${url}`)
@@ -459,10 +446,18 @@ class BotPlus {
 
     await page.waitForSelector( '.singlebutton button.btn-secondary');
     const commitButton = await page.$( '.singlebutton button.btn-secondary')
+    // 等待commit的click功能
     await commitButton.click()
+    await handleDelay(300);
     console.debug("编辑按钮")
 
-    await page.waitForSelector('iframe') ;
+    // 可能会超时，需要重新加载
+    await page.waitForSelector('iframe', {timeout:45000}).catch(async(e)=>{
+      console.error( " TimeoutError: waiting for selector iframe", e)
+      await page.reload()
+    }); 
+
+    // 多等一会  failed: timeout 30000ms exceeded
     const textBody = await page.$('iframe')
 
     let fullname = `${this.couseTitle}_${classId}`
@@ -489,6 +484,8 @@ class BotPlus {
     await page.waitForSelector('.form-group input.btn-primary');
     const saveButton = await page.$('.form-group input.btn-primary')
     await saveButton.click()
+    // 现在这里就直接保存了，需要延时以免数据没有提交成功
+    await handleDelay(300);
 
     // 点击提交按钮
     if( options.submitfinal == 'yes'){
@@ -502,6 +499,8 @@ class BotPlus {
       await page.waitForSelector(confirmButtonCss);
       const confirmButton = await page.$( confirmButtonCss )
       await confirmButton.click()
+      // 延时以免数据没有提交成功
+      await handleDelay(300);
       console.debug("点击确认按钮")
     }
 
@@ -553,7 +552,7 @@ class BotPlus {
    * 调用前需先调用 
    * @param {string} couseTitle -  如：“中国特色社会主义理论体系概论”
   */
-  async copyQuiz( couseTitle ) {
+  async copyQuiz( couseTitle, byreview = false ) {
 
     await this.prepareForLearn( couseTitle )
 
@@ -573,8 +572,13 @@ class BotPlus {
     
     let lessons = this.couseInfo.status
     
-    let quizArray = await copyQuizBase( this.driver, urlbase, lessons )
-
+    let quizArray = []
+    
+    if( byreview ) {
+      quizArray = await copyQuizBaseByReview( this.driver, urlbase, lessons )
+    }else{
+      quizArray = await copyQuizBase( this.driver, urlbase, lessons )
+    }
       // 生成试题文件
     let answerfile = `db/answers/${fullname}.txt`
 
@@ -601,6 +605,34 @@ class BotPlus {
     }
 
     fs.writeFileSync(answerfile, answerStr);
+
+    let answerList = []
+    for( let i=0; i<quizArray.length; i++){
+      let quiz = quizArray[i];
+      // 有时为空，需要跳过
+      answerList[i] = []
+      let level2 = 0
+      for( let j = 0; j<quiz.length; j++ ){
+        let question = quiz[j]
+        let { title, options, type, answer} = question
+        
+        if( type =='h1'){
+          
+          answerList[i][level2] = []
+          level2+=1
+        }else if( type == 'select'){
+          answerList[i][level2-1].push( { title, answer })
+          
+        }else if( type == 'tof'){
+          answerList[i][level2-1].push( { title, answer })
+        }
+
+      }
+    }
+    let answerjson = `db/answers/${fullname}.json`
+
+    // console.log( "answerjson", answerjson)
+    fs.writeFileSync(answerjson, JSON.stringify({ answers: answerList}));
 
   }
 
@@ -684,14 +716,19 @@ class BotPlus {
     console.log( "this.couseInfo.status", this.couseInfo.status.length)
 
     let moduleStatus = this.couseInfo.status
-
-    for (let i = 0; i < moduleStatus.length; i++) {
-      let lesson = moduleStatus[i];
-
-      if ((lesson.title == '终结性考试' || lesson.title == '大作业')&& lesson.type =='assign') {
-        await this.goFinal(lesson, options)
+    
+      for (let i = 0; i < moduleStatus.length; i++) {
+        let lesson = moduleStatus[i];
+        try{
+          if ((lesson.title == '终结性考试' || lesson.title == '大作业')&& lesson.type =='assign') {
+            await this.goFinal(lesson, options)
+          }
+        }catch(e){
+          console.error( `无法学习课程 ${lesson.title} url=${lesson.url} account=${this.username}`,e);
+          logger.error( `无法学习课程 ${lesson.title} url=${lesson.url} account=${this.username}`,e)
+        }
       }
-    }
+
   }
 
 

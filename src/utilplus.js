@@ -112,19 +112,21 @@ function getCourseNameByCode(code) {
 
 }
 
-async function handle503( page, url, delay=10000){
+/**
+ * 
+ * @param {*} page 
+ * @param {*} url 
+ * @param {*} delay 
+ * @return {boolean}  is meet 503  
+ */
+async function handle503( page, url, delay=5000){
   let title = await page.title();
 
-  let isOK = true
+  let isOK = false
   console.log( 'handle503 title=', title)
   if( title.startsWith( '503 Service')){
     console.error("503 延时5秒开始, 防止出现503, 服务器响应问题" )
-    await  page.waitForFunction( function(delay){
-      return new Promise((resolve, reject) => {
-        console.error("503 延时5秒" )
-        setTimeout(()=>{ resolve(true)}, delay);
-      })
-    }, {}, delay);
+    await handleDelay(delay )
     console.log('handle 503 get url again');
      
     // 
@@ -136,7 +138,7 @@ async function handle503( page, url, delay=10000){
       await page.reload() 
     }
     console.log('handle 503 get url again', url);
-    isOK = false
+    isOK = true
   }
   return isOK
 }

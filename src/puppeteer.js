@@ -15,13 +15,14 @@ const LAUNCH_PUPPETEER_OPTS = {
     //'–single-process',
     "--proxy-server='direct://'", 
     '--proxy-bypass-list=*'
-  ]
+  ],
+  defaultViewport:{ width: 1024, height:768 }
 };
 
 const PAGE_PUPPETEER_OPTS = {
-  networkIdle2Timeout: 5000,
+  networkIdle2Timeout: 10000,
   waitUntil: 'networkidle2',
-  timeout: 3000000
+  timeout: 5000000
 };
 
 class PuppeteerDriver {
@@ -58,13 +59,9 @@ class PuppeteerDriver {
       await this.initBrowser();
     }
     // 如果没有打开的再创建
-    const pages = await this.browser.pages()
-    let newPage = null;
-    if( pages.length == 0 ){
-      newPage = await this.browser.newPage();
-    }else{
-      newPage = pages[0]
-    }
+    let newPage = await this.browser.newPage();
+    
+
     console.log( '准备打开：', url )
     
     await Promise.all( [ newPage.waitForNavigation(), newPage.goto(url, PAGE_PUPPETEER_OPTS)]).catch(async e=>{
@@ -73,6 +70,16 @@ class PuppeteerDriver {
       await newPage.goto(url, PAGE_PUPPETEER_OPTS)
       
     });
+
+    // 关闭其他pages
+    const pages = await this.browser.pages()
+    for( let i=0; i<pages.length; i++){
+      let page = pages[i]
+      if( page != newPage ){
+        await page.close()
+      }
+    }
+
     return newPage
   }
 

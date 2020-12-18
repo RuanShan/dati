@@ -35,7 +35,7 @@ const {
 const isNetwork = true
 
 program
-  .version('1.0.1')
+  .version('2.0.1')
   .option('-c, --config <configfile>', 'config file')
   .option('-u, --username <username>', 'user name')
   .option('-p, --password <password>', 'user password')
@@ -53,28 +53,7 @@ program.command('createlog <course>')
     handleCreateLog(course, program.username, program.password)
   })
 
-// 生成学习用 module id 文件
-program.command('createModuleFile <course>')
-  .description('create module file')
-  .action(function(course) {
-    // 4065_习近平新时代中国特色社会主义思想
-    let type = program.type
-    let filename = './db/subjects/' + course + '.json'
-    let data = fs.readFileSync(filename, "utf-8")
-    let res = JSON.parse(data);
-    let moduleids = []
-    res.forEach((r) => {
-      if (type == r.type) {
-        moduleids.push(r.id)
-      }
-    })
-
-    // 保存文件
-    let saveFilename = `./db/subjects/${course}_${type}_module.json`
-    fs.writeFileSync(saveFilename, JSON.stringify(moduleids))
-
-    
-  })
+ 
 
 program.command('simplelearn')
   .description('simple learn')
@@ -143,7 +122,6 @@ program.command('readscore <course>')
     handleReadScore(course, program.username, program.password)
   })
 
-let cids = ['毛泽东思想和中国特色社会主义理论体系概论', '国家开放大学学习指南', '习近平新时代中国特色社会主义思想', '思想道德修养与法律基础', '中国近现代史纲要', '马克思主义基本原理概论']
 
 // 根据网络数据，创建所有课程的数据文件
 program.command('initdb [accountfile]')
@@ -237,74 +215,7 @@ program.command('learn')
 
     // 按顺序学习每门课程
   })
-
-// 根据网络数据，创建所有课程的数据文件并学习所有课程
-program.command('all [accountfile]')
-  .description('learn all courses.')
-  .action(async function(accountfile) {
-    if (!isAvaible()) {
-      console.log("软件出现问题，请联系开发人员！")
-      return
-    }
-    let options = {
-      type: program.type
-    }
-    // 取得所有账户信息
-    // 为每个账户创建课程日志
-    let accounts = await getAccountsJsonByKey(accountfile)
-    console.log("learn all courses", accountfile, accounts)
-    for (let i = 0; i < accounts.length; i++) {
-      let account = accounts[i]
-      let username = account.username
-      let password = account.password
-      await handleCreateDb(cids, username, password, options)
-      await handleLearnCourses(cids, username, password, options)
-    }
-    // 按顺序学习每门课程
-  })
-
-// 学习给定一些账户的N节课
-// course 如果是中文的话，bat文件会产生乱码
-program.command('lmodules <course> [moduleCode]')
-  .description('learn by code module')
-  .action(async function(course, moduleCode) {
-    if (!enableVideoApi) {
-      console.log("功能开发中...")
-      return
-    }
-    if (!isAvaible()) {
-      console.log("软件出现问题，请联系开发人员！")
-      return
-    }
-    console.log("handleLearnModuleByCode ", course, program.type, Number(course), moduleCode)
-    let accounts = []
-    if (program.account || program.username) {
-      accounts = await getAccounts(program.account)
-    }
-
-    let courseTitle = course
-    if (Number(course)) {
-      courseTitle = getCourseNameByCode(course)
-    }
-
-    // 如果moduleCode 没有传，取得课程的所有 module
-    let moduleCodes = null
-    if (moduleCode) {
-      let moduleCodes = [moduleCode]
-    } else {
-      moduleCodes = await getModuleIds(courseTitle)
-    }
-    let options = {
-      type: program.type,
-      submitquiz: program.submitquiz,
-    }
-    if (program.type == 'video') {
-      await handleLearnModuleOfAccounts(accounts, courseTitle, moduleCodes, options)
-    } else {
-      await handleLearnModuleOfAccounts2(accounts, courseTitle, moduleCodes, options)
-    }
-  })
-
+ 
 program.command('lfinal')
   .description('learn final exam ')
   .action(async function(course,accountfile) {
@@ -365,16 +276,22 @@ program.command('genaccount')
     await  handleGenAccounts(accounts  )
 })
 
-program.command( 'genquiz')  
+program.command( 'genquiz [byreview]')  
 .description('生成测验数据文件')
-.action(async function( ) {
+.action(async function( byreview) {
    
   let accounts = await getAccounts( )
 
-  // { username: '', password: '', subject: '', code: ''}
+  console.log( "byreview=", byreview)
+  byreview = 'byreview'
+  handleGenQuiz(accounts, byreview)
 
-  handleGenQuiz(accounts)
+})
 
+program.command( 'parsecsv <filename>')  
+.description('解析账户数据文件')
+.action(async function( filename) {
+  await parseSubjcts(filename)
 })
 
 //
@@ -503,6 +420,68 @@ async function getAccountsCsvByKey(filename) {
   return accounts
 }
 
+// 解析csv文件，字段 realname,username,gender,idnum,birth,major,subjects
+
+async function parseSubjcts(filename ){
+  
+  if (filename) {
+    
+      let data = fs.readFileSync(filename, "utf-8")
+      if (data != null) {
+
+        let accounts = csvParseSync(data, {
+          columns: true,
+          skip_empty_lines: true
+        });
+
+        let newAccounts = []
+        let uniqSubjectAccounts = []
+        let uniqSubjects = []
+        
+console.log( `accounts = ${accounts.length}`)
+        for( let i=0; i<accounts.length; i++){
+          let account = accounts[i]
+
+          let {realname, username, password, subjects} = account
+
+          let subjectArray = subjects.split( '、')
+
+          for( let j = 0; j<subjectArray.length; j++){            
+            let subject = subjectArray[j]
+            console.log( `subjectArray${j}= `,subjectArray, subject)
+            if( subject.length == 0){
+              continue;
+            }
+            let account = {realname, username, password, subject}
+
+            if( !uniqSubjects.includes(subject)){
+              uniqSubjects.push( subject )
+              uniqSubjectAccounts.push( account )
+            }
+            newAccounts.push( account )
+          }
+        }
+
+        let newfilename = 'subjects2.csv'
+        const csv = stringify(newAccounts, { header: true, columns:['realname', 'username', 'password', 'subject']}, function(err, records){
+          fs.writeFileSync(newfilename, records)
+          console.log( "after save to file:", newfilename )
+        })
+
+        let newfilename2 = 'subjects1.csv'
+        const csv2 = stringify(uniqSubjectAccounts, {header: true, columns:['realname', 'username', 'password', 'subject']}, function(err, records){
+          fs.writeFileSync(newfilename2, records)
+          console.log( "after save to file:", newfilename2 )
+        })
+
+      } else {
+        console.error(`无法读取账户文件 ${filename}`);
+      }
+    
+  }
+
+
+}
 // 软件是否可用
 function isAvaible() {
   let availabe = new Date('2020-12-30')

@@ -45,7 +45,7 @@ function addAccount(account){
         let data = fs.readFileSync(dbfile, "utf-8")
         records = JSON.parse(data);
     }
-    let key = account.username  
+    let key = account.username + '_'+ account. code
     records[key] = account
     fs.writeFileSync(dbfile, JSON.stringify(records))
   

@@ -161,23 +161,7 @@ async function handleCreateLog(courseCode, username, password ) {
   //return bot
 }
 
-async function createLog(bot, courseCode, username, password ) {
-  if( !username || !password){
-    throw  new Error( "用户名和密码是必须的")
-  }
-  // 清除
-  courseCode = courseCode.trim();
-
-  console.log(" bot doing profile a course")
-    // 1934001474084
-    // 19930902
-  await bot.login(username, password)
-  await bot.prepareForLearn(courseCode)
-  await bot.profileCouse(courseCode)
-  await bot.createAnswerList(courseCode)
-
-}
-
+ 
 async function handleReadScore(courseCode, username, password){
   let driver = new PuppeteerDriver();
   let bot = new Bot(driver)
@@ -399,7 +383,7 @@ async function handleLearnModuleOfAccounts2(accounts, courseCode, moduleCodes, o
  * 生成题库文件
  * @param {[]} accounts { username, password, code }
  */
-async function handleGenQuiz(accounts){
+async function handleGenQuiz(accounts, byreview){
   let driver = new PuppeteerDriver();
 
   let bot = new Bot(driver )
@@ -414,7 +398,7 @@ async function handleGenQuiz(accounts){
       continue
     }
     await bot.login( username, password )
-    await bot.copyQuiz( subject )
+    await bot.copyQuiz( subject, byreview )
     await bot.logout()
 
   }
@@ -437,88 +421,89 @@ async function simpleLearn(accounts, options={}) {
     let account = accounts[i]
     let { username, password, subject} = account
     
-    console.debug(  username, password, subject )
+    console.debug(  `i=${i} username=${username}, password=${password}, subject=${subject}` )
     if( !username || !password || !subject){
       continue
     }
     // 课程信息 { code, title, url, host }
     let couseInfo = null;
     // 课程数据文件信息
-    let sujectFileInfo = { success: false};
+    let subjectFileInfo = { success: false};
     
     // 1. 检查登录是否成功
     let islogin = await bot.login( username, password )
-    
+    let isexist = false
     // 2. 检查课程是否存在，查询课程代码
     if( islogin){
       couseInfo = await bot.prepareForLearn(subject)
 
-    }
-    console.log( "simpleLearn 2. 检查课程是否存在，查询课程代码 ", couseInfo)
-    // 课程代码在前，内部使用，作为课程文件命名
+   
+      console.log( "simpleLearn 2. 检查课程是否存在，查询课程代码 ", couseInfo)
+      // 课程代码在前，内部使用，作为课程文件命名
 
-    
-    // 3. 根据课程代码，查询课程数据文件
-
-    if ( couseInfo ){ 
-      // {success, path }
-      let couseFullname = `${couseInfo.title}_${couseInfo.code}`
-      let subjectfile = `./db/subjects/${couseFullname}.json`
-      let isexist =  fs.existsSync(subjectfile )
-
-      subjectFileInfo = await produceSubjectFile( bot, couseInfo )
       
-      console.log( "simpleLearn 3.  根据课程代码，查询课程数据文件 ", sujectFileInfo)
-    }
-    let {success, path} = subjectFileInfo ; // 课程数据文件是否存在
+      // 3. 根据课程代码，查询课程数据文件
 
-    if( success){
-      // 如果存在需要加载课程数据
-      console.log( "simpleLearn 3.1  需要加载课程数据 ", path)
-      await bot.getLog( couseInfo.title, { filename: path } )
-    }
-    // 4. 查询用户账号数据文件，查询当前用户当前课程进度
-    // 
-    let accountInfo = getAccount( username )
-    console.log( "simpleLearn 4.0  查询当前用户当前课程进度 ", accountInfo)
+      if ( couseInfo ){ 
+        // {success, path }
+        let couseFullname = `${couseInfo.title}_${couseInfo.code}`
+        let subjectfile = `./db/subjects/${couseFullname}.json`
+        isexist =  fs.existsSync(subjectfile )
 
-    if( accountInfo == null ){
-      accountInfo = { username, password, subject, islogin: islogin, isexist:isexist, code: couseInfo.code, videodone: false, quizdone: false, pagedone: false, finaldone: false }
-    }
-    console.log( "simpleLearn 4.1  查询当前用户当前课程进度 ", accountInfo)
-    // 如果当前课程可以学习
-    // 5.1 学习单元测试，并保存进度
-    if( ( type == null || type=='page') && !accountInfo.pagedone ){
-      await bot.learnCouse({ type: 'page' })
-      accountInfo.pagedone = true
-      addAccount( accountInfo )      
-    }
-    // 5.2 学习视频，并保存进度
-    if( ( type == null || type=='video') && !accountInfo.videodone ){
-      await bot.learnCouse({ type: 'video' })
-      accountInfo.videodone = true
-      addAccount( accountInfo )
-    }
-    // 5.3 学习单元测试，并保存进度
-    if( ( type == null || type=='quiz') && !accountInfo.quizdone ){
-      await bot.learnCouse({ type: 'quiz' })
-      if( submitquiz == 'yes'){
-        accountInfo.quizdone = true
-        addAccount( accountInfo )
+        subjectFileInfo = await produceSubjectFile( bot, couseInfo )
+        
+        console.log( "simpleLearn 3.  根据课程代码，查询课程数据文件 ", subjectFileInfo)
       }
-    }
+      let {success, path} = subjectFileInfo ; // 课程数据文件是否存在
 
-    // 7. 学习终结性考试，并保存进度
-    console.log( "simpleLearn 7  学习终结性考试 ", submitfinal)
-    if( ( type == null || type=='final') && !accountInfo.finaldone ){
-      await bot.learnFinal( { submitfinal:submitfinal } )       
-        accountInfo.finaldone = true
-        addAccount( accountInfo )      
+      if( success){
+        // 如果存在需要加载课程数据
+        console.log( "simpleLearn 3.1  需要加载课程数据 ", path)
+        await bot.getLog( couseInfo.title, { filename: path } )
+      }
+      // 4. 查询用户账号数据文件，查询当前用户当前课程进度
+      // 
+      let key = username+'_'+couseInfo.code 
+      let accountInfo = getAccount( key )
+      console.log( "simpleLearn 4.0  查询当前用户当前课程进度 ", accountInfo)
+
+      if( accountInfo == null ){
+        accountInfo = { username, password, subject, islogin: islogin, isexist:isexist, code: couseInfo.code, videodone: false, quizdone: false, pagedone: false, finaldone: false }
+      }
+      console.log( "simpleLearn 4.1  查询当前用户当前课程进度 ", accountInfo)
+      // 如果当前课程可以学习
+
+      if(couseInfo ){
+        // 5.1 学习单元测试，并保存进度
+        if( ( type == null || type=='page') && !accountInfo.pagedone ){
+          await bot.learnCouse({ type: 'page' })
+          accountInfo.pagedone = true
+        }
+        // 5.2 学习视频，并保存进度
+        if( ( type == null || type=='video') && !accountInfo.videodone ){
+          await bot.learnCouse({ type: 'video' })
+          accountInfo.videodone = true
+        }
+        // 5.3 学习单元测试，并保存进度
+        if( ( type == null || type=='quiz') && !accountInfo.quizdone ){
+          await bot.learnCouse({ type: 'quiz', submitquiz: submitquiz })
+          if( submitquiz == 'yes'){
+            accountInfo.quizdone = true
+          }
+        }
+        // 7. 学习终结性考试，并保存进度
+        console.log( "simpleLearn 7  学习终结性考试 ", submitfinal)
+        if( ( type == null || type=='final') && !accountInfo.finaldone ){
+          await bot.learnFinal( { submitfinal:submitfinal } )       
+          accountInfo.finaldone = true
+        }
+      }
+
+      // 8. 保存账号数据
+      addAccount( accountInfo )      
+
     }
-    // 8. 保存账号数据
-  
     await bot.logout()
-
   }
   await driver.quit()
 }
@@ -622,7 +607,7 @@ async function handleGenSubject( accounts ){
         })
 
         if( gencouse ){
-          await bot.createAnswerList(couseName)
+          //await bot.createAnswerList(couseName)
     
           // 1. ./db/students/2021201400283_习近平新时代中国特色社会主义思想.json
           let studentfile = await bot.getCouseJsonPath( bot.couseTitle )
@@ -720,7 +705,7 @@ async function produceSubjectFile(bot, couseInfo){
           })
   console.log( "produceSubjectFile: 解析课程", couseName, gencouse )
           if( gencouse ){
-            await bot.createAnswerList(couseName)
+            //await bot.createAnswerList(couseName)
       
             for( let i=0;i< couseDetail.status.length; i++){
               couseDetail.status[i].isFinish='未完成'
