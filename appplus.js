@@ -1,14 +1,14 @@
 const program = require('commander')
 const fs = require('fs')
+const path = require('path')
 const csv = require('csv');
 const stringify = require('csv-stringify')
 
 const csvParseSync = require('csv-parse/lib/sync')
-const {
-  getCourseNameByCode
-} = require('./src/util.js');
+ 
+const { log } = require('./src/logger');
 
-
+const config = require( './config')
 const { BotPlus } = require( './src/botplus')
 const { PuppeteerDriver } = require( './src/puppeteer.js')
 const enableVideoApi = true
@@ -16,12 +16,10 @@ const {
   handleCreateDb,
   handleAccountsCheckin,
   handleCreateLog,
-  handleLearnCourse,
-  handleLearnCourses,
+   handleLearnCourses,
   handleLearnModuleByCode,
   handleGetCourseSumaries,
-  handleLearnModuleOfAccounts,
-  handleLearnModuleOfAccounts2,
+ 
   handleReadScore,
   getAccountsCourseCode,
   handleLearnFinal,
@@ -31,8 +29,7 @@ const {
   simpleLearn
 } = require('./src/indexplus')
 
-// example: node app.js -- createlog 4255 #毛泽东思想和中国特色社会主义理论体
-const isNetwork = true
+
 
 program
   .version('2.0.1')
@@ -71,28 +68,7 @@ program.command('simplelearn')
     await simpleLearn(accounts, options)
   })
 
-program.command('lcourse <course>')
-  .description('learn all module')
-  .action(async function(course) {
-    if (!isAvaible()) {
-      console.log("软件出现问题，请联系开发人员！")
-      return
-    }
-    let courseTitle = course
-    if (Number(course)) {
-      courseTitle = getCourseNameByCode(course)
-    }
-
-    let accounts = await getAccountsJsonByKey(program.account)
-    let username = null,
-      password = null
-    if (accounts.length > 0) {
-      username = accounts[0].username
-      password = accounts[0].password
-    }
-    console.log("handleLearnCourse ", course, username, password)
-    handleLearnCourse(courseTitle, username, password)
-  })
+ 
 
 program.command('lmodule <course> <module>')
   .description('learn by code module')
@@ -223,7 +199,6 @@ program.command('lfinal')
       console.log("软件出现问题，请联系开发人员！")
       return
     }
-    console.log('accountfile----:'+ accountfile);
     let accounts = []
     if (program.account || program.username) {
       accounts = await getAccounts(program.account)
@@ -296,26 +271,13 @@ program.command( 'parsecsv <filename>')
 
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
-program.parse(process.argv)
-
-if (program.username) console.log(`- ${program.username}`);
-if (program.password) console.log(`- ${program.password}`);
-
 async function loadConfig(){
   // 
+  config.appPath = __dirname;
+  config.subjectPath = path.join(config.appPath, '/db/subjects' )
 }
-
-async function testBotplus(){
-  let driver = new PuppeteerDriver
-
-  let bot = new BotPlus(driver)
-
-  await bot.login( '2021101201496', '19850114');
-  let subject = '国家开放大学学习指南'
-  await bot.prepareForLearn(subject);
-  await bot.profileCouse(subject)
-}
+loadConfig();
+program.parse(process.argv);
 
  
 async function getAccounts(accountfile=null) {
@@ -323,7 +285,7 @@ async function getAccounts(accountfile=null) {
   if ( program.account ){
     accountfile = program.account
   }
-console.log( 'accountfile=', accountfile)   
+  log.info( '账号文件路径', accountfile)   
 
   let accounts = []
   if (/csv$/.test(accountfile)) {

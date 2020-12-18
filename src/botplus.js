@@ -4,6 +4,9 @@ const {
   Key,
   until
 } = require('selenium-webdriver');
+const path = require( 'path')
+const AppConfig = require( '../config')
+
 const {
   getCourseNameByCode,
   scrollToBottom,
@@ -13,30 +16,14 @@ const {
 const fs = require('fs');
 const URL = require('url');
 
-const log4js = require('log4js');
-log4js.configure({
-  appenders: {
-    app: {
-      type: 'file',
-      filename: 'app.log'
-    },
-    console: {
-      type: "stdout"
-    }
-  },
-  categories: {
-    default: {
-      appenders: ['app', 'console'],
-      level: 'debug'
-    }
-  }
-});
+const { log } = require('./logger');
 
 const lessonStateEnum = {
   initial: '未完成',
   completed: '完成'
 }
-const logger = log4js.getLogger();
+
+
 const {
   AnswerList
 } = require('./makeAnswerJson.js');
@@ -86,8 +73,14 @@ class BotPlus {
 
   // 读取用户课程数据文件
   // options - filename: 数据文件路径
+  /**
+   * 
+   * @param {*} couseTitle 
+   * @param {*} options 
+   * @return {boolean} 是否成功 
+   */
   async getLog(couseTitle, options = {}) {
-    let that = this
+    let success = false
     this.couseTitle = couseTitle
     this.recursiveCount = 0
     let {
@@ -103,15 +96,15 @@ class BotPlus {
       if (data != null) {
 
         let res = JSON.parse(data);
-        console.info(`读取课程数据 ${couseTitle}`);
         this.couseInfo.status = res;
+        success  = true
       }
     } else {
-      logger.error(`无法读取课程数据文件 ${filename}`);
-      filename = null
+      log.error(`无法读取课程数据文件 ${filename}`);
+      success = false
     }
 
-    return filename
+    return success
   }
 
 
@@ -156,7 +149,7 @@ class BotPlus {
         console.log(`文件已被保存:${filename}`);
       });
     } else {
-      logger.error(`无法读取课程数据文件 ${filename}`);
+      log.error(`无法读取课程数据文件 ${filename}`);
     }
   }
 
@@ -186,16 +179,16 @@ class BotPlus {
     try {
       const [response] = await Promise.all([  page.waitForNavigation( ),  page.click(".login-form button[value='login']") ]).catch(async (e)=>{
         // 偶尔会没有重定向，需要重新请求一下
-        console.error( '未知问题登录失败，尝试再次打开http://student.ouchn.cn/')
+        log.error( '未知问题登录失败，尝试再次打开 http://student.ouchn.cn/')
         await page.goto('http://student.ouchn.cn/')
       });
       
       let url = await page.url()
 
       if(url.startsWith('http://passport.ouchn.cn')){
-        logger.error(`登录失败 ${username}!!`);
+        log.error(`登录失败 ${username}!!`);
       } else{
-        console.info('登录成功!!');
+        log.info('登录成功');
         success = true
         await page.goto('http://student.ouchn.cn/')
       }
@@ -214,7 +207,7 @@ class BotPlus {
       //this.mainHandle = await driver.getWindowHandle()
 
     } catch (e) {
-      logger.error('登录失败!!', e);
+      log.error('登录异常', e);
     }
     this.mainPage = page
     return success
@@ -235,7 +228,7 @@ class BotPlus {
     
     let typeFilter = options.type
     let lessionIndex = options.lessionIndex || 0
-    console.info("课程学习中", this.couseTitle, 'options=', options,  this.couseInfo.status.length)
+    log.debug( `课程学习中 ${this.couseTitle}`, '参数', options )
     
    
     let moduleStatus = this.couseInfo.status
@@ -256,7 +249,7 @@ class BotPlus {
       try{
        
         let title = lesson.title
-        logger.info(`学习小节${title} url=${url}`)
+        log.debug(`学习小节${title} url=${url}`)
         let done = false
         if (type == 'video') {
           //http://anhui.ouchn.cn/course/view.php?id=4257&sectionid=91623&mid=561704
@@ -274,7 +267,7 @@ class BotPlus {
             isFinish = '完成'
           }
         } else {
-          logger.error(`无法识别的课程url =${url}`)
+          log.error(`无法识别的课程url =${url}`)
         }
         // 每学完一课，更新一下数据文件
         lesson.isFinish = isFinish
@@ -282,8 +275,7 @@ class BotPlus {
           this.saveCouseJson(this.couseTitle)
         }
       }catch(e){
-        console.error( `无法学习课程 ${lesson.title} url=${url} account=${this.username}`,e);
-        logger.error( `无法学习课程 ${lesson.title} url=${url} account=${this.username} `,e)
+        log.error( `无法学习课程 ${lesson.title} url=${url} account=${this.username} `,e)
       }
     }
     //
@@ -294,7 +286,7 @@ class BotPlus {
 
   async learnModule(moduleCode, options) {
 
-    logger.info(`课程${ this.couseTitle} 小节 ${moduleCode} 开始学习。`)
+    log.info(`课程${ this.couseTitle} 小节 ${moduleCode} 开始学习。`)
     let driver = this.driver
     let moduleStatus = this.couseInfo.status
     let success = false
@@ -325,10 +317,10 @@ class BotPlus {
 
           await this.goQuiz(lesson, lesson.position, options)
         } else {
-          logger.error(`无法识别的课程url =${url}`)
+          log.error(`无法识别的课程url =${url}`)
         }
       }
-      //  logger.error(`无法识别的小节代码 =${moduleCode}`)
+      //  log.error(`无法识别的小节代码 =${moduleCode}`)
 
 
     }
@@ -509,8 +501,8 @@ class BotPlus {
   // 通过api去看视频
   async watchVideoByApi(lesson) {
     // $.getJSON('http://shenyang.ouchn.cn/theme/blueonionre/modulesCompletion.php?cmid=437329&id=3935&sectionid=27', function(res){ console.log(res)})
-    console.log('==================watchVideo=================', CouseUrlMap);
-    let success = true
+
+    let success = false
     let course = CouseUrlMap[this.couseTitle]
 
     let driver = this.driver
@@ -519,9 +511,8 @@ class BotPlus {
     let classId = lesson.classId
     let sectionId = lesson.sectionId
     if (isFinish == '未完成') {
-      console.log('lesson:', lesson);
-      let url = lesson.url
-      let title = lesson.title
+
+     
       // http://shenyang.ouchn.cn/mod/url/view.php?id=526346
       let page = await driver.get(`http://${course.host}/mod/url/view.php?id=${id}`);
       // 可能被重定向到 xxx.pdf
@@ -531,13 +522,14 @@ class BotPlus {
         let script = `jQuery.ajaxSetup({ async : false}); var res = null; jQuery.getJSON('/theme/blueonionre/modulesCompletion.php?cmid=${id}&id=${classId}&sectionid=${sectionId}', function(data){ res = data; }); ;`
         // "视频播放延时1秒, 防止API没有成功！"
         let res = await page.evaluate(script);
-        await handleDelay(500);
+        await handleDelay(300);
          
-        console.log('视频播放成功', typeof(res), res);
+        success = (res == 1)
+        log.info(`视频播放成功${success}`);
       } catch (ex) {
-        success = false
-        logger.error(`视频播放失败：${this.username} ${id} ${ex}`);
-        console.error('视频播放失败：' + id, ex);
+        
+        handleBotError( this, ex )
+
       }
     }
 
@@ -644,7 +636,7 @@ class BotPlus {
    */
 
   async prepareForLearn(couseTitle) {
-    console.log( "============= prepareForLearn0 =============")
+
     // 处理 “4498_中国特色社会主义理论体系概论” 情况, 避免 "人文英语3" 中的3被清除
     couseTitle = couseTitle.replace(/^[\d_-\s]+/, '')
     let driver = this.driver
@@ -652,10 +644,10 @@ class BotPlus {
     let mainPage = this.mainPage //await driver.getWindowHandle()
     let links = await this.getCousesLinks(mainPage, couseTitle);
     if (links.length == 0) {
-      console.error('无法找到课程' + couseTitle)
+      log.error(`无法找到课程 ${couseTitle}`)
       return false
     }
-    console.log( 'links', links.length)
+    //log.debug( 'links', links.length)
     // https://segmentfault.com/q/1010000019135401
     // https://www.zhihu.com/question/306082778/answer/556674503
     // 每次点击新建页面，需要关闭
@@ -682,7 +674,8 @@ class BotPlus {
 
         let tidyWindowTitle = windowTitle.replace(/[\(\)（）]/g, '').toLowerCase()
         let tidyCouseTitle = couseTitle.replace(/[\(\)（）]/g, '').toLowerCase()
-        console.debug(`couseTitle=${couseTitle} windowTitle = ${windowTitle}, url= ${url} code=${code} tidyWindowTitle=${tidyWindowTitle} tidyCouseTitle=${tidyCouseTitle}`);
+        
+        //log.debug(`couseTitle=${couseTitle} windowTitle = ${windowTitle}, url= ${url} code=${code} tidyWindowTitle=${tidyWindowTitle} tidyCouseTitle=${tidyCouseTitle}`);
 
         if (tidyCouseTitle && tidyWindowTitle.indexOf(tidyCouseTitle) >= 0) {
           this.couseTitle = couseTitle
@@ -702,10 +695,8 @@ class BotPlus {
         }
        
     cousePage.close()
-    console.log("current window url=", url)
+    // log.debug("current window url=", url)
     this.recursiveCount = 0
-
-    console.log( "============= prepareForLearn1 =============")
 
     return CouseUrlMap[couseTitle]
   }
@@ -724,8 +715,7 @@ class BotPlus {
             await this.goFinal(lesson, options)
           }
         }catch(e){
-          console.error( `无法学习课程 ${lesson.title} url=${lesson.url} account=${this.username}`,e);
-          logger.error( `无法学习课程 ${lesson.title} url=${lesson.url} account=${this.username}`,e)
+          log.error( `无法学习课程 ${lesson.title} url=${lesson.url} account=${this.username}`,e)
         }
       }
 
@@ -814,7 +804,7 @@ class BotPlus {
       await mainPage.waitForSelector('#zaixuekecheng .media');
       let div = await mainPage.$('#zaixuekecheng');
       let couses = await mainPage.$$('#zaixuekecheng .media');
-      console.debug("getCousesLinks couses=", couseTitle, couses.length);
+      //log.debug("getCousesLinks couses=", couseTitle, couses.length);
       for (let i = 0; i < couses.length; i++) {
         let couse = couses[i]
         //let titleElement = await couse.$eval('.media-title', node=> node.innerText );
@@ -825,16 +815,14 @@ class BotPlus {
         //   "Photoshop图像处理".toLowerCase() => "photoshop图像处理"
 
         title = title.toLowerCase()
-        console.debug("getCousesLinks couse=", title, title.includes(couseTitle));
+        //log.debug("getCousesLinks couse=", title, title.includes(couseTitle));
         if (title.includes(couseTitle)) {
           links.push(buttonElement)
         }
       }
 
     }catch(e){
-      logger.error(`无法读取课程链接 ${this.username} ${this.password} ${couseTitle}`);
-      let path = `./db/log/${couseTitle}_${this.username}.jpg`
-      await mainPage.screenshot({type: 'jpeg', path: path})
+      handleBotError( this, e)
     }
     // 不知因为什么原因会多一个, 可能是angular生成的隐藏button对象，
     return links
@@ -987,6 +975,16 @@ class BotPlus {
    
   }
 
+  /**
+   * 返回课程数据文件，数据文件记录课程的所有章节内容
+   * @param {*} couseBaseInfo couseTitle, couseCode
+   */
+  getSubjectDataFilePath( couseBaseInfo ){
+    let couseFullname = `${couseBaseInfo.title}_${couseBaseInfo.code}`
+    let subjectfile =  path.join( AppConfig.appPath, `./db/subjects/${couseFullname}.json`)
+    return subjectfile
+  }
+
   // 获取课程详细信息, prepareForLearn后才能使用
   getCourseInfo(couseTitle){
     let couse = CouseUrlMap[couseTitle]
@@ -1011,7 +1009,7 @@ class BotPlus {
         this.courseInfo.status = res;
       }
     } else {
-      logger.error(`无法读取课程数据文件 ${filename}`);
+      log.error(`无法读取课程数据文件 ${filename}`);
       filename = null
     }
 
@@ -1020,7 +1018,17 @@ class BotPlus {
 
 }
 
+async function handleBotError( bot, e ){
+  let { username,couseTitle } = bot
+  log.error(`异常错误 ${this.username} ${couseTitle}`, e);
+  let pages = await bot.driver.pages()
+  for( let i=0; i<pages.length; i++){
+    let path = `./db/log/${couseTitle}_${username}_${i}.jpg`
+    let page = pages[i]
+    await page.screenshot({type: 'jpeg', path: path})
 
+  }
+}
 
 module.exports = {
   BotPlus

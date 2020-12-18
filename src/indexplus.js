@@ -1,12 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 const stringify = require('csv-stringify')
+const { log } = require('./logger');
 
-const {
-  scrollToBottom,
-  playVideo
-} = require('./util.js');
-
+const config = require( '../config')
 
 const {
   BotPlus,  
@@ -20,12 +17,7 @@ const {
 const Bot =  BotPlus
 const { PuppeteerDriver } = require( './puppeteer.js')
 
-const {
-  Builder,
-  By,
-  Key,
-  until
-} = require('selenium-webdriver');
+ 
 
 const GenCouseError = { }; // code => false
 // 检查登录账户是否可用
@@ -412,96 +404,114 @@ async function handleGenQuiz(accounts, byreview){
  */
 
 async function simpleLearn(accounts, options={}) {
+
+  log.info( "配置", config)
   let driver = new PuppeteerDriver();
   let { type, submitquiz, submitfinal } = options
   let bot = new Bot(driver )
-  console.debug("开始学习小节, 人数=", accounts.length)
+  log.info("开始学习课程 人数=", accounts.length)
 
   for (let i = 0; i < accounts.length; i++) {
     let account = accounts[i]
     let { username, password, subject} = account
     
-    console.debug(  `i=${i} username=${username}, password=${password}, subject=${subject}` )
+    let accountstr = `用户名=${username},密码=${password}, 课程=${subject}`;
+    log.debug(  `${i+1} ${accountstr}` )
     if( !username || !password || !subject){
       continue
     }
     // 课程信息 { code, title, url, host }
-    let couseInfo = null;
+    let couseBaseInfo = null;
     // 课程数据文件信息
     let subjectFileInfo = { success: false};
     
     // 1. 检查登录是否成功
     let islogin = await bot.login( username, password )
-    let isexist = false
+    let isFileExists = false
     // 2. 检查课程是否存在，查询课程代码
     if( islogin){
-      couseInfo = await bot.prepareForLearn(subject)
+      couseBaseInfo = await bot.prepareForLearn(subject)
 
-   
-      console.log( "simpleLearn 2. 检查课程是否存在，查询课程代码 ", couseInfo)
+      log.debug( "课程基本信息", couseBaseInfo)
       // 课程代码在前，内部使用，作为课程文件命名
 
       
       // 3. 根据课程代码，查询课程数据文件
 
-      if ( couseInfo ){ 
+      if ( couseBaseInfo ){ 
         // {success, path }
-        let couseFullname = `${couseInfo.title}_${couseInfo.code}`
-        let subjectfile = `./db/subjects/${couseFullname}.json`
-        isexist =  fs.existsSync(subjectfile )
+        let subjectfile = bot.getSubjectDataFilePath( couseBaseInfo )
 
-        subjectFileInfo = await produceSubjectFile( bot, couseInfo )
+        let couseFullname = `${couseBaseInfo.title}_${couseBaseInfo.code}`
         
-        console.log( "simpleLearn 3.  根据课程代码，查询课程数据文件 ", subjectFileInfo)
-      }
-      let {success, path} = subjectFileInfo ; // 课程数据文件是否存在
+        isFileExists =  fs.existsSync(subjectfile )
+        let isSubjectLoaded= false
+        if( !isFileExists ){
+          let success = await produceSubjectFile( bot, couseBaseInfo )
 
-      if( success){
-        // 如果存在需要加载课程数据
-        console.log( "simpleLearn 3.1  需要加载课程数据 ", path)
-        await bot.getLog( couseInfo.title, { filename: path } )
-      }
-      // 4. 查询用户账号数据文件，查询当前用户当前课程进度
-      // 
-      let key = username+'_'+couseInfo.code 
-      let accountInfo = getAccount( key )
-      console.log( "simpleLearn 4.0  查询当前用户当前课程进度 ", accountInfo)
-
-      if( accountInfo == null ){
-        accountInfo = { username, password, subject, islogin: islogin, isexist:isexist, code: couseInfo.code, videodone: false, quizdone: false, pagedone: false, finaldone: false }
-      }
-      console.log( "simpleLearn 4.1  查询当前用户当前课程进度 ", accountInfo)
-      // 如果当前课程可以学习
-
-      if(couseInfo ){
-        // 5.1 学习单元测试，并保存进度
-        if( ( type == null || type=='page') && !accountInfo.pagedone ){
-          await bot.learnCouse({ type: 'page' })
-          accountInfo.pagedone = true
-        }
-        // 5.2 学习视频，并保存进度
-        if( ( type == null || type=='video') && !accountInfo.videodone ){
-          await bot.learnCouse({ type: 'video' })
-          accountInfo.videodone = true
-        }
-        // 5.3 学习单元测试，并保存进度
-        if( ( type == null || type=='quiz') && !accountInfo.quizdone ){
-          await bot.learnCouse({ type: 'quiz', submitquiz: submitquiz })
-          if( submitquiz == 'yes'){
-            accountInfo.quizdone = true
+          if( success){
+            // 如果存在需要加载课程数据
+            isFileExists = true
+          
+          }else{
+            log.error( `${accountstr} 课程数据文件生成异常 ${subjectfile}`)
           }
         }
-        // 7. 学习终结性考试，并保存进度
-        console.log( "simpleLearn 7  学习终结性考试 ", submitfinal)
-        if( ( type == null || type=='final') && !accountInfo.finaldone ){
-          await bot.learnFinal( { submitfinal:submitfinal } )       
-          accountInfo.finaldone = true
+        if( isFileExists ){
+          // 设置当前课程，加载课程数据文件
+          isSubjectLoaded = await bot.getLog( couseBaseInfo.title, { filename: subjectfile } )
+        }else{
+          log.error( `${accountstr} 没有找到课程数据文件 ${subjectfile}`)
         }
-      }
 
+
+        if( isSubjectLoaded ){
+          // 4. 查询用户账号数据文件，查询当前用户当前课程进度
+          // 
+          let key = username+'_'+couseBaseInfo.code 
+          let accountInfo = getAccount( key )
+
+          
+          if( accountInfo == null ){
+            accountInfo = { username, password, subject, islogin: islogin, isexist:isexist, code: couseBaseInfo.code, videodone: false, quizdone: false, pagedone: false, finaldone: false }
+          }
+          log.info( `课程进度`, accountInfo)
+          // 如果当前课程可以学习
+
+          // 5.1 学习单元测试，并保存进度
+          if( ( type == null || type=='page') && !accountInfo.pagedone ){
+            await bot.learnCouse({ type: 'page' })
+            accountInfo.pagedone = true
+          }
+          // 5.2 学习视频，并保存进度
+          if( ( type == null || type=='video') && !accountInfo.videodone ){
+            await bot.learnCouse({ type: 'video' })
+            accountInfo.videodone = true
+          }
+          // 5.3 学习单元测试，并保存进度
+          if( ( type == null || type=='quiz') && !accountInfo.quizdone ){
+            await bot.learnCouse({ type: 'quiz', submitquiz: submitquiz })
+            if( submitquiz == 'yes'){
+              accountInfo.quizdone = true
+            }
+          }
+          // 7. 学习终结性考试，并保存进度
+
+          if( ( type == null || type=='final') && !accountInfo.finaldone ){
+            await bot.learnFinal( { submitfinal:submitfinal } )       
+            accountInfo.finaldone = true
+          }
+        
+        }
+
+      }else{
+        log.error(  `${accountstr} 没有找到课程`)
+      }
       // 8. 保存账号数据
       addAccount( accountInfo )      
 
+    }else{
+      log.error(  `${accountstr} 登录失败`)
     }
     await bot.logout()
   }
@@ -682,29 +692,27 @@ async function handleGenAccounts( accounts ){
 
 /**
  * 根据课程信息生成课程数据文件
- * @param {*} couseInfo 
+ * @param {*} couseBaseInfo 
  * @returns {} { success, msg, error }  - 是否成功
  */
-async function produceSubjectFile(bot, couseInfo){
-  console.log( "============= produceSubjectFile0 =============")
+async function produceSubjectFile(bot, couseBaseInfo){
 
+  
         // 课程代码在前，内部使用，作为课程文件命名
-        let couseFullname = `${couseInfo.title}_${couseInfo.code}`
-        let subjectfile = `./db/subjects/${couseFullname}.json`
-        let gencouse = true
-        isexist =  fs.existsSync(subjectfile )
-        // 如果文件存在则跳过
-        iserror = GenCouseError[couseInfo.code] === false
-        
-        if( !isexist && !iserror){
-          let couseName = couseInfo.title
+ 
+        let success = true
+         // 如果文件存在则跳过
+        iserror = GenCouseError[couseBaseInfo.code] === false
+        let subjectfile = bot.getSubjectDataFilePath( couseBaseInfo )
+        if(  !iserror){
+          let couseName = couseBaseInfo.title
           let couseDetail = await bot.profileCouse(couseName).catch((e)=>{
-            console.error( "profileCouse error", e)
-            gencouse = false
-            GenCouseError[couseInfo.code] = false
+            log.error( "课程数据文件生成异常", e)
+            success = false
+            GenCouseError[couseBaseInfo.code] = false
           })
-  console.log( "produceSubjectFile: 解析课程", couseName, gencouse )
-          if( gencouse ){
+
+          if( success ){
             //await bot.createAnswerList(couseName)
       
             for( let i=0;i< couseDetail.status.length; i++){
@@ -724,17 +732,16 @@ async function produceSubjectFile(bot, couseInfo){
             createModuleFile( couseFullname, moduleType )
         
             // 3. 创建可执行文件, 文件的最后4个字符为课程号，
-            //let couseFullname2 = `${couseInfo.title}_${couseInfo.code}`
+            //let couseFullname2 = `${couseBaseInfo.title}_${couseBaseInfo.code}`
             //createBinFile(couseFullname2)
         
             // 4. 添加课程数据到indexdb.json
-            addCouseIntoDb( couseInfo.code, couseInfo.title )
+            addCouseIntoDb( couseBaseInfo.code, couseBaseInfo.title )
           }
   
         }
-        console.log( "============= produceSubjectFile1 =============")
 
-      return { success: gencouse,  msg: null, path: subjectfile }
+      return success
 }
   
  

@@ -1,10 +1,6 @@
-const {
-  Builder,
-  By,
-  Key,
-  until
-} = require('selenium-webdriver');
+
 const fs = require('fs');
+const { log } = require('./logger');
 
 const domain = 'ouchn.cn'
 async function scrollToBottom(page) {
@@ -42,7 +38,7 @@ async function playVideo(driver, canvas) {
 
   console.log('this is a video');
 
-  let video = await driver.wait(until.elementLocated(By.tagName('video')), 10000);
+  let video = await driver.waitForSelector( 'video' );
 
   let duration = await driver.wait(function() {
     return video.getAttribute('duration').then(function(aaaa) {
@@ -148,7 +144,7 @@ async function handleDelay( delay = 500 ){
 
    
     return new Promise((resolve, reject) => {
-      console.error(`  延时 ${delay} ms` )
+      log.debug(`延时 ${delay} ms` )
       setTimeout(()=>{ resolve(true)}, delay);
     })
    

@@ -1,5 +1,6 @@
 const puppeteer = require('puppeteer');
 const iPhone = puppeteer.devices['iPhone 6'];
+const { log } = require('./logger');
 
 const LAUNCH_PUPPETEER_OPTS = {
   executablePath: './chromium/chrome.exe',
@@ -49,10 +50,7 @@ class PuppeteerDriver {
       await this.browser.close();
     }
   }
-
-  async login( username, password){
-
-  }
+ 
   // return Page
   async get( url ){
     if (!this.browser) {
@@ -61,12 +59,11 @@ class PuppeteerDriver {
     // 如果没有打开的再创建
     let newPage = await this.browser.newPage();
     
-
-    console.log( '准备打开：', url )
+    log.debug( '准备打开', url )
     
     await Promise.all( [ newPage.waitForNavigation(), newPage.goto(url, PAGE_PUPPETEER_OPTS)]).catch(async e=>{
       // 试试重新加载, 不能使用reload， 这样页面并不是新页面
-      console.error( '无法打开：', url )
+      log.error( '无法打开', url )
       await newPage.goto(url, PAGE_PUPPETEER_OPTS)
       
     });
@@ -92,50 +89,7 @@ class PuppeteerDriver {
     this.closeBrowser();
   }
 
-  async getPageContent(url, suburls=[]) {
-    if (!this.browser) {
-      await this.initBrowser();
-    }
-    
-    try {
-      let hasJson = false;
-      let subcontent = [];
-      const page = await this.browser.newPage();
-      await page.emulate(iPhone); // emulate的配置有Viewport，UserAgent等等。之前的setUserAgent等方法是它的语法糖。
-
-      await page.setRequestInterception(true);
-      page.on('request', (req) => {
-          if(req.resourceType() == 'stylesheet' || req.resourceType() == 'font' || req.resourceType() == 'image'){
-              req.abort();
-          } else {
-            
-            req.continue();
-          }
-      });
-      page.on('response', async res => {
-        //get and parse the url for later filtering
-        let requrl = res.url()
-        let i = suburls.findIndex((regx)=>regx.test( requrl))
-        if( i>=0 ){
-          
-
-          let json = await res.json()
-          subcontent[i] = json.data
-        }
-        
-      })
-
-      await page.goto(url, PAGE_PUPPETEER_OPTS);
-      const pageContent = await page.content();
-
-      //await page.screenshot({type: 'png', path: `example.png`})
-      page.close();
-
-      return { pageContent, subcontent };
-    } catch (err) {
-      throw err;
-    }
-  }
+   
 
 }
 
