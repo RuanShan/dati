@@ -1,17 +1,21 @@
-
-// 毛泽东思想和中国特色社会主义理论体系概论
-const {
-  Builder,
-  By,
-  Key,
-  until
-} = require('selenium-webdriver');
 const fs = require('fs');
+const { log } = require('../logger');
 
-const {answers} = require ('../../db/answers/xiList.json');
 const { handle503, handleDelay} = require ('../utilplus');
 
 let recursiveCount = 0
+
+async function parseCouse( page ){
+  let progressBar = await page.$( '.progress-bar' );
+
+  if( progressBar ){
+    return await parseCouseBase( page )
+  }else{
+    return await parseCouseBase2( page )
+  }
+
+}
+
 /**
  * 分析课程章节数据
  * @param {*} page 
@@ -24,15 +28,15 @@ async function parseCouseBase(page) {
   let sectionl2Css = "li.activity"
   let sectionl2LinkCss = "a"
 
-  console.log('before wait ');
+  // log.debug('before wait ');
   await page.waitForSelector( '.progress-bar' );
-  console.log('after wait ');
+  // log.debug('after wait ');
 
   let title = await page.title()
   let url = await page.url()
-  console.log('url----------------:', url);
+  // log.debug('url----------------:', url);
   let classId = url.substring(url.indexOf('id=') + 3);
-  console.log('classId----:', classId);
+  // log.debug('classId----:', classId);
 
 
   let levelOne = await page.$x(sectionl1Path)
@@ -50,10 +54,10 @@ async function parseCouseBase(page) {
     let text = await a.$eval('div',node=>node.innerText)
     let idHandle = await a.getProperty('id')
     let sectionId = await idHandle.jsonValue()
-    console.log(`levelOne.text ${i} ${sectionId} ${text}`)
+    // log.debug(`levelOne.text ${i} ${sectionId} ${text}`)
     let levelTwo = await a.$$(sectionl2Css)
     if (levelTwo.length == 0) {
-      console.log(`levelOne.text ${i} ${sectionId} ${text} 没有内容。`)
+      // log.debug(`levelOne.text ${i} ${sectionId} ${text} 没有内容。`)
       continue
     }
     // 电大资源区，自建资源区
@@ -83,11 +87,12 @@ async function parseCouseBase(page) {
       // http://anhui.ouchn.cn/theme/blueonionre/pix/page_h.png
       // http://anhui.ouchn.cn/theme/blueonionre/pix/core_h.png
       // http://anhui.ouchn.cn/theme/blueonionre/pix/quiz_h.png
+      // http://liaoning.ouchn.cn/theme/blueonionres/pix/forum_h.png
       if (imgs.length >= 1){
         // 每节课前面的图标
         let srcHandle =  await imgs[0].getProperty('src')
         let src = await srcHandle.jsonValue()
-        console.log( "src=", src  )
+        // log.debug( "src=", src  )
         if( src.includes('core_h.png')){ //视频1：新时代党的建设总要求网页地址
           type = 'video'
         }else if( src.includes('quiz_h.png')){
@@ -96,6 +101,8 @@ async function parseCouseBase(page) {
           type = 'page'
         }else if( src.includes('assign_h.png')){
           type = 'assign'
+        } else if( src.includes('forum_h.png')){
+          type = 'forum'
         }
       }
 
@@ -117,7 +124,7 @@ async function parseCouseBase(page) {
       }
       status.push(course)
       if (alt.startsWith("未完成")) {
-        console.log(`levelTwo.text ${j} ${id} ${type} ${text} ${href} ${alt}`)
+        // log.debug(`levelTwo.text ${j} ${id} ${type} ${text} ${href} ${alt}`)
       }
     }
   }
@@ -129,6 +136,125 @@ async function parseCouseBase(page) {
   return couseJson
 }
 
+/**
+ * 分析课程章节数据,  如：幼儿园课程论
+ * @param {*} page 
+ */
+async function parseCouseBase2( page ){
+
+  let sectionl1Path = "ul.topics>li, ul.flexsections>li"
+  let sectionl2Css = "li.activity"
+  let sectionl2LinkCss = "a"
+
+   
+  await page.waitForSelector( '.topics .section .activity,.flexsections .section .activity' );
+  
+
+  let title = await page.title()
+  let url = await page.url()
+  //log.debug('url----------------:', url);
+  let classId = url.substring(url.indexOf('id=') + 3);
+  //log.debug('classId----:', classId);
+
+
+  let levelOne = await page.$$(sectionl1Path)
+   
+  let status = []
+  let classinfo = {
+    title: title,
+    url: url,
+    classId: classId
+  }
+  for (let i = 0; i < levelOne.length; i++) {
+    let a = levelOne[i]
+    let titleDiv= await a.$('.sectionname,.section-title')
+    if( !titleDiv ){
+      // 可能不存在标题
+      continue
+    }
+    let text = await a.$eval('.sectionname,.section-title',node=>node.innerText)
+    let idHandle = await a.getProperty('id')
+    let sectionId = await idHandle.jsonValue()
+    log.debug(`levelOne.text ${i} ${sectionId} ${text}`)
+    let levelTwo = await a.$$(sectionl2Css)
+    if (levelTwo.length == 0) {
+      log.debug(`levelOne.text ${i} ${sectionId} ${text} 没有内容。`)
+      continue
+    }
+    // 电大资源区，自建资源区
+    if( /课程文件|资源更新区|电大资源区|资源自建区|资源区/.test( text )){
+      continue
+    }
+    // 课程文件, 资源更新区, 电大资源区
+
+    for (let j = 0; j < levelTwo.length; j++) {
+      log.debug( `i=${i} j=${j}`)
+      let b = levelTwo[j]
+      let contentwithoutlink = await b.$('.contentwithoutlink')
+      if( contentwithoutlink ){
+        // 有的只是标题，跳过即可
+        continue
+      }
+
+      let text = await  b.$eval('div',node=>node.innerText)
+      let idHandle = await  b.getProperty('id')
+      let id =await idHandle.jsonValue()
+      let imgs = await b.$$( 'img')
+      let alt = "未完成"
+      let href = ''
+      let type = 'unkonwn' // text, video, quiz
+      // http://liaoning.ouchn.cn/theme/image.php/boost/page/1604384853/icon
+      // http://liaoning.ouchn.cn/theme/image.php/boost/forum/1604384853/icon
+      // http://liaoning.ouchn.cn/theme/image.php/boost/core/1604384853/f/document-24
+      // http://liaoning.ouchn.cn/theme/image.php/boost/assign/1604384853/icon
+      // http://liaoning.ouchn.cn/theme/image.php/boost/url/1604384853/icon
+
+      
+      if (imgs.length >= 1){
+        // 每节课前面的图标
+        let srcHandle =  await imgs[0].getProperty('src')
+        let src = await srcHandle.jsonValue()
+        // log.debug( "src=", src  )
+        if( src.includes('boost/url')){ //视频1：新时代党的建设总要求网页地址
+          type = 'boost_url'
+        }else if( src.includes('boost/core')){
+          type = 'boost_core'
+        }else if( src.includes('boost/page')){
+          type = 'boost_page'
+        }else if( src.includes('boost/assign')){
+          type = 'boost_assign'
+        } else if( src.includes('boost/forum')){
+          type = 'boost_forum'
+        }
+      }
+      href = await b.$eval( sectionl2LinkCss, node=> node.href )
+
+      // if (imgs.length >= 2) {
+      //   // 由于前面的内容没有学习，可能没有链接元素，后面没有圆圈图片
+      //   let altHandle =  await imgs[1].getProperty('alt')
+      //   alt = await altHandle.jsonValue()
+      //   //let link = await b.$eval( sectionl2LinkCss, node=> node.href )
+      // }
+      let course = {
+        classId: classId, // 用于script调用，如完成视频
+        sectionId: sectionId.substring(8), // section-xxx
+        type: type,
+        title: text,
+        isFinish: alt.substring(0, 3),
+        url: href,
+        id: id.substring(7) // module-xxx
+      }
+      status.push(course)
+       
+    }
+  }
+  let couseJson = {
+    score: classinfo,
+    status: status
+  }
+
+  return couseJson
+}
 /**
  * 
  * 解析专题测验的内容，生产题库
@@ -146,7 +272,7 @@ async function copyQuizBase(driver, baseurl, couseLessons ) {
 
   //   let title = await page.title()
   //   let url = await page.url()
-  //   console.debug( title, url)
+  //   // log.debug( title, url)
   // })
 
   let quizArray = []
@@ -165,7 +291,7 @@ async function copyQuizBase(driver, baseurl, couseLessons ) {
         //   let status = await response.status()
         //   if( status == 503){
         //     let url = await response.url()
-        //     console.debug( "resonse=", url)
+        //     // log.debug( "resonse=", url)
         //     is503 = true
         //   }
         // }
@@ -173,7 +299,7 @@ async function copyQuizBase(driver, baseurl, couseLessons ) {
         let quiz = await copyOneQuiz(newPage,  true, url, couseLessons, 0,).catch( async (error)=>{
           let title = await newPage.title()
 
-          console.debug( "catch title=", title)
+          // log.debug( "catch title=", title)
           is503 = true
         })
 
@@ -181,7 +307,7 @@ async function copyQuizBase(driver, baseurl, couseLessons ) {
         //newPage.removeListener( 'response', responseListener)
       
         if( is503 ){
-          console.log( '503 i=',i, i-1)
+          // log.debug( '503 i=',i, i-1)
           i = i-1;
           continue
         }
@@ -217,7 +343,7 @@ async function copyOneQuiz( page,  isFirstPage, url ){
   
 
   if(isFirstPage){
-    console.log('==============isFirstPage==============');
+    // log.debug('==============isFirstPage==============');
      
     // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
  
@@ -235,7 +361,7 @@ async function copyOneQuiz( page,  isFirstPage, url ){
   const submitPage = await page.$(submitPageSelector)
 
   let questions = await page.$$(queSelector)
-  console.debug( `questions:${questions.length}`)
+  // log.debug( `questions:${questions.length}`)
 
   let keyWords1 = ['一', '二', '三', '四'];
   let level_1 = 0;
@@ -253,7 +379,7 @@ async function copyOneQuiz( page,  isFirstPage, url ){
     //let answerInputs = await questionEle.$$('.answer input')
     //let answerLabels = await questionEle.$$('.answer label')
     let answerWraps = await questionEle.$$('.answer')
-    console.log('question---:',question  );
+    // log.debug('question---:',question  );
     
     if (keyWords1.indexOf(question[0]) != -1 && question[1] =='、') {
       keynum = 0; // 每一道题的下标
@@ -263,17 +389,17 @@ async function copyOneQuiz( page,  isFirstPage, url ){
       continue;
     }
     //let key = jsonStr[num][level_1][keynum]
-    //console.log('key---:',key);
+    //// log.debug('key---:',key);
     for( let j = 0; j< answerWraps.length; j++){
       let answer = answerWraps[j];
 
       //let as =  await answer.$$eval('input', node=> node.value)
       let labels  = await answer.$$eval('label', nodes=> nodes.map( n=>n.innerText))
 
-      console.log(labels);
+      // log.debug(labels);
       if(labels.length==2){//判断题
         
-          console.log('chose ',labels);
+          // log.debug('chose ',labels);
           copyQuestion = { title: question, type: 'tof', options: labels  }
       }else{//选择题
         // a. 国家开放大学是基于信息技术的特殊的大学
@@ -283,7 +409,7 @@ async function copyOneQuiz( page,  isFirstPage, url ){
 
         copyQuestion = { title: question, type: 'select', options: fixedLabels  }
 
-        console.log('chose ', fixedLabels);
+        // log.debug('chose ', fixedLabels);
 
       }
     }
@@ -295,13 +421,13 @@ async function copyOneQuiz( page,  isFirstPage, url ){
  
 
   if(nextPage){
-    console.log('=======has nextPage=======');
+    // log.debug('=======has nextPage=======');
     await Promise.all( [page.waitForNavigation(), nextPage.click()])
 
     let otherCopys =  await copyOneQuiz( page, false )
     copys = copys.concat( otherCopys)
   }else if(submitPage){
-    console.log('=======has submitPage=======');
+    // log.debug('=======has submitPage=======');
 
   }
   return copys
@@ -333,14 +459,14 @@ async function copyQuizBaseByReview(driver, baseurl, couseLessons ) {
 
         let quiz = await copyOneQuizByReview(newPage,  true, url, couseLessons, 0,).catch( async (error)=>{
           let title = await newPage.title()
-          console.debug( "catch title=", title)
+          // log.debug( "catch title=", title)
           is503 = true
         })
         
         //newPage.removeListener( 'response', responseListener)
       
         if( is503 ){
-          console.log( '503 i=',i, i-1)
+          // log.debug( '503 i=',i, i-1)
           i = i-1;
           continue
         }
@@ -377,7 +503,7 @@ async function copyOneQuizByReview( page,  isFirstPage, url ){
   
 
   if(isFirstPage){
-    console.log('==============isFirstPage==============');
+    // log.debug('==============isFirstPage==============');
      
     // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
  
@@ -395,7 +521,7 @@ async function copyOneQuizByReview( page,  isFirstPage, url ){
   const submitPage = await page.$(submitPageSelector)
 
   let questions = await page.$$(queSelector)
-  console.debug( `questions:${questions.length}`)
+  // log.debug( `questions:${questions.length}`)
 
   let keyWords1 = ['一', '二', '三', '四'];
   let level_1 = 0;
@@ -410,7 +536,7 @@ async function copyOneQuizByReview( page,  isFirstPage, url ){
     //let answerInputs = await questionEle.$$('.answer input')
     //let answerLabels = await questionEle.$$('.answer label')
     let answerWraps = await questionEle.$$('.answer')
-    console.log('question---:',question  );
+    // log.debug('question---:',question  );
     
     if (keyWords1.indexOf(question[0]) != -1 && question[1] =='、') {
       keynum = 0; // 每一道题的下标
@@ -420,7 +546,7 @@ async function copyOneQuizByReview( page,  isFirstPage, url ){
       continue;
     }
     //let key = jsonStr[num][level_1][keynum]
-    //console.log('key---:',key);
+    //// log.debug('key---:',key);
     for( let j = 0; j< answerWraps.length; j++){
       let answer = answerWraps[j];
 
@@ -432,7 +558,7 @@ async function copyOneQuizByReview( page,  isFirstPage, url ){
 
       if(labels.length==2){//判断题
         
-          console.debug('chose ',labels);
+          // log.debug('chose ',labels);
           //正确的答案是“错”。
           correct = correct.substr( 7,1)
           copyQuestion = { title: question, type: 'tof', options: labels, answer: correct  }
@@ -446,7 +572,7 @@ async function copyOneQuizByReview( page,  isFirstPage, url ){
 
         copyQuestion = { title: question, type: 'select', options: fixedLabels, answer: correct  }
 
-        console.log('chose ', fixedLabels);
+        // log.debug('chose ', fixedLabels);
 
       }
     }
@@ -458,20 +584,20 @@ async function copyOneQuizByReview( page,  isFirstPage, url ){
  
 
   if(nextPage){
-    console.log('=======has nextPage=======');
+    // log.debug('=======has nextPage=======');
     await Promise.all( [page.waitForNavigation(), nextPage.click()])
 
     let otherCopys =  await copyOneQuizByReview( page, false )
     copys = copys.concat( otherCopys)
   }else if(submitPage){
-    console.log('=======has submitPage=======');
+    // log.debug('=======has submitPage=======');
 
   }
   return copys
 }
 
 /**
- * 
+ * 答题
  * @param {*} driver 
  * @param {*} url 
  * @param {*} options 
@@ -494,7 +620,7 @@ async function handleQuizBase( driver, url,  options, answsers, num){
   // 进入测试页面
   await Promise.all( [page.waitForNavigation(), button.click()]).catch(async e=>{
     // 试试重新加载, 不能使用reload， 这样页面并不是新页面
-    console.error( '答题页面打开超时...', e)
+    log.error( '答题页面打开超时...', e)
     navSuccess = false
       
   }); 
@@ -503,7 +629,7 @@ async function handleQuizBase( driver, url,  options, answsers, num){
     await processOneQuiz( page,answsers, num, options )
   }else{
     recursiveCount += 1
-    console.log( '答题页面打开超时 递归调用 handleQuizBase... ', navSuccess, recursiveCount)
+    log.warn( '答题页面打开超时 递归调用 handleQuizBase... ', navSuccess, recursiveCount)
     await handleQuizBase( driver, url,  options, answsers, num)
   }
 }
@@ -519,7 +645,6 @@ async function handleQuizBase( driver, url,  options, answsers, num){
  * @param {*} answsers 
  */ 
 async function processOneQuiz( page, answsers,  num, options){
-  console.log('====================processOneQuiz================');
 
   //let queXpath = "//div[@class='que truefalse deferredfeedback notyetanswered']"
   let queSelector = ".que"
@@ -536,7 +661,7 @@ async function processOneQuiz( page, answsers,  num, options){
   const submitPage = await page.$(submitPageSelector)
 
   let questions = await page.$$(queSelector)
-  console.debug( `questions:${questions.length}`)
+  //// log.debug( `questions:${questions.length}`)
 
   let keyWords1 = ['一', '二', '三', '四'];
   
@@ -546,15 +671,14 @@ async function processOneQuiz( page, answsers,  num, options){
     let question = await questionEle.$eval( '.qtext p', node=> node.innerText)
     let answerWraps = await questionEle.$$('.answer')
 
-    console.log('question---:',question);
     if(keyWords1.indexOf(question[0]) != -1){
       keynum = 0; // 每一道题的下标
       level_1=keyWords1.indexOf(question[0]);
       continue;
     }
-    console.log(`answsers[${num}][${level_1}][${keynum}]:`);
+    //log.debug(`answsers[${num}][${level_1}][${keynum}]:`);
     let key = answsers[num][level_1][keynum]
-    console.log('key---:',key);
+    //log.debug('key---:',key);
 
 
     for( let j = 0; j< answerWraps.length; j++){
@@ -562,14 +686,14 @@ async function processOneQuiz( page, answsers,  num, options){
       let labels = await answer.$$('label')
       let labelTexts  = await answer.$$eval('label', nodes=> nodes.map( n=>n.innerText))
 
-      console.log(labelTexts);
+      //log.debug(labelTexts);
       if(labelTexts.length==2){//判断题
         for( let k = 0; k< labelTexts.length; k++){
           let b = labelTexts[k]
           let label = labels[k]
           if(b==key.answer){
             await label.click()
-            console.log('chose '+b);
+            // log.debug('chose '+b);
           }else{
             continue
           }
@@ -581,7 +705,6 @@ async function processOneQuiz( page, answsers,  num, options){
           let label = labels[k]
           if(b.includes( key.answer )){
             await label.click()
-            console.log('chose '+b);
           }
         }
       }
@@ -590,24 +713,24 @@ async function processOneQuiz( page, answsers,  num, options){
   }
 
   if(nextPage){
-    console.log('=======has nextPage=======');
+    //log.debug('=======has nextPage=======');
     await Promise.all( [page.waitForNavigation(), nextPage.click()])
 
     return await processOneQuiz( page,answsers,num, options)
   }else if(submitPage){
-    console.log('=======has submitPage=======');
+    //log.debug('=======has submitPage=======');
     await Promise.all([  page.waitForNavigation(), submitPage.click()])
     
     let is503 = await handle503(page);
     if( is503 ){
-      console.log('=======handle submitPage 503=======');
+      // log.debug('=======handle submitPage 503=======');
     }
     // 提交后等 300ms，以免切换页面后，内容返回，导致新页面内容不正确, 因为ajax 所以 waitForNavigation 不起作用
     await  handleDelay(   );
 
   }
 
-  console.log('options----:',options);
+  // log.debug('options----:',options);
 
   if(options.submitquiz == 'yes'){
     // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
@@ -615,13 +738,13 @@ async function processOneQuiz( page, answsers,  num, options){
     await page.waitForSelector( '.submitbtns button.btn-secondary' );
 
     const submitButton = await page.$$('.submitbtns button.btn-secondary')
-    console.log('submitButton-----:',submitButton.length);
+    // log.debug('submitButton-----:',submitButton.length);
     await submitButton[1].click()
 
     await page.waitForSelector( '.confirmation-dialogue input.btn-primary' );
 
     const ensureButton = await page.$$('.confirmation-dialogue input.btn-primary')
-    console.log('ensureButton-----:',ensureButton.length);
+    // log.debug('ensureButton-----:',ensureButton.length);
     await Promise.all([  page.waitForNavigation(), ensureButton[0].click()])
 
     // 提交后等 300ms，以免直接切换页面，请求没有发到服务器端？
@@ -634,7 +757,7 @@ async function processOneQuiz( page, answsers,  num, options){
  * @param {*} file_path 
  */
 async function parseAnswerTextBase(file_path) {
-  console.log('====================makeSiXiuAnswerJson======================');
+  // log.debug('====================makeSiXiuAnswerJson======================');
   var answerJson = null
   var i = 1; //txt中的行数
   let answerList = []
@@ -660,7 +783,7 @@ async function parseAnswerTextBase(file_path) {
           let param = {
             answer: answer
           }
-          console.log( 'level', level_1,level_2, 'result', result)
+          // log.debug( 'level', level_1,level_2, 'result', result)
           answerList[level_1 - 1][level_2 - 1].push(param)
         } else if(result.indexOf('形考')==0){
           level_2 = 0
@@ -670,13 +793,15 @@ async function parseAnswerTextBase(file_path) {
       }
     }
   }
-  console.log('answerList------------:',JSON.stringify( answerList ));
+  // log.debug('answerList------------:',JSON.stringify( answerList ));
   return answerList
 }
 
 
 module.exports={
+  parseCouse,
   parseCouseBase,
+  parseCouseBase2,
   handleQuizBase,
   copyQuizBase,
   copyQuizBaseByReview,

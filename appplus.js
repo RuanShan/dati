@@ -7,7 +7,7 @@ const stringify = require('csv-stringify')
 const csvParseSync = require('csv-parse/lib/sync')
  
 const { log } = require('./src/logger');
-
+const { buildCouseTitle } = require('./src/utilplus')
 const config = require( './config')
 const { BotPlus } = require( './src/botplus')
 const { PuppeteerDriver } = require( './src/puppeteer.js')
@@ -301,7 +301,7 @@ async function getAccounts(accountfile=null) {
   accounts.forEach((acc)=>{
     if( acc.subject ){
       // 清除空格，字母小写便于比较
-      acc.subject = acc.subject.trim().toLowerCase()
+      acc.subject = buildCouseTitle( acc.subject )
     }
   })
   return accounts

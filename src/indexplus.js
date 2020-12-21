@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const stringify = require('csv-stringify')
+//const parallelLimit = require('async/parallelLimit');
+
 const { log } = require('./logger');
 
 const config = require( '../config')
@@ -96,7 +98,7 @@ async function getAccountsCourseCode(  accounts=[] ) {
 async function handleCreateDb(accounts=[] ) {
   let driver = new PuppeteerDriver();
   let bot = new Bot(driver)
-  console.log("机器人初始化成功")
+  
   for (let i = 0; i < accounts.length; i++) {
     let account = accounts[i]
     let username = account.username
@@ -113,24 +115,22 @@ async function handleCreateDb(accounts=[] ) {
 
     if( success ){
         //04391-习近平新时代中国特色社会主义思想
-        let courseCode = subject.replace(/[\d_-\s]+/g,'')
-        await bot.prepareForLearn(courseCode)
+        let courseTitle = subject
+        await bot.prepareForLearn(courseTitle)
         // 如果这门课的数据文件存在
-        let exists =  isCouseJsonExists( username, courseCode)
+        let exists =  isCouseJsonExists( username, courseTitle)
         if( !exists ){
-          await bot.profileCouse(courseCode)
+          await bot.profileCouse(courseTitle)
+          // .catch(async(e)=>{
+          //   log.error( `无法创建课程数据文件 ${courseTitle}`, e)
+          // })
         }
-        await bot.closeOtherTabs( )
         await bot.logout()
 
     }else{
-      console.debug('登录失败账号', username, password)
+      log.error('登录失败账号', username, password)
     }
-
-
   }
-
-  //await saveUserJson( username, userInfo )
   await driver.quit()
 }
 
@@ -214,16 +214,16 @@ async function handleLearnCourses(accounts=[] , options = {}) {
 
     if( success ){
         //04391-习近平新时代中国特色社会主义思想
-        let courseCode = subject.replace(/[\d_-\s]+/g,'')
-        await bot.prepareForLearn(courseCode)
+        let courseTitle = subject
+        await bot.prepareForLearn(courseTitle)
 
-        let log = await bot.getLog( courseCode)
+        let log = await bot.getLog( courseTitle)
         if( log ){
-          console.error("开始学习课程："+ courseCode )
+          console.error("开始学习课程："+ courseTitle )
           await bot.learnCouse(options)
         }else{
           //throw  new Error( "用户名和密码是必须的")
-          console.error("没有找到课程数据文件："+ courseCode )
+          console.error("没有找到课程数据文件："+ courseTitle )
         }
         await bot.closeOtherTabs( )
 
@@ -473,7 +473,7 @@ async function simpleLearn(accounts, options={}) {
 
           
           if( accountInfo == null ){
-            accountInfo = { username, password, subject, islogin: islogin, isexist:isexist, code: couseBaseInfo.code, videodone: false, quizdone: false, pagedone: false, finaldone: false }
+            accountInfo = { username, password, subject, islogin: islogin, isexist:isFileExists, code: couseBaseInfo.code, videodone: false, quizdone: false, pagedone: false, finaldone: false }
           }
           log.info( `课程进度`, accountInfo)
           // 如果当前课程可以学习
@@ -486,6 +486,7 @@ async function simpleLearn(accounts, options={}) {
           // 5.2 学习视频，并保存进度
           if( ( type == null || type=='video') && !accountInfo.videodone ){
             await bot.learnCouse({ type: 'video' })
+            // await bot.watchAllVideoByApi()
             accountInfo.videodone = true
           }
           // 5.3 学习单元测试，并保存进度
@@ -501,14 +502,14 @@ async function simpleLearn(accounts, options={}) {
             await bot.learnFinal( { submitfinal:submitfinal } )       
             accountInfo.finaldone = true
           }
-        
+          // 8. 保存账号数据
+          addAccount( accountInfo )      
         }
 
       }else{
         log.error(  `${accountstr} 没有找到课程`)
       }
-      // 8. 保存账号数据
-      addAccount( accountInfo )      
+
 
     }else{
       log.error(  `${accountstr} 登录失败`)
@@ -518,6 +519,22 @@ async function simpleLearn(accounts, options={}) {
   await driver.quit()
 }
 
+
+async function parallelSimpleLearn(accounts, options={}) {
+
+  let newAccountGroups = _.chunk(accounts, 6)
+
+  // 6个进程
+  let promiseArray= []
+  for(let i=0; i<newAccountGroups.length; i++){
+    let accountGroup = newAccountGroups[i]
+    let p = simpleLearn(accountGroup, options)
+    promiseArray.push( p )
+  }
+
+  await Promise.all( promiseArray )
+
+}
 
 async function saveUserJson(username, userInfo) {
   let filename =  './db/students/' + username  + '.json'
@@ -722,14 +739,14 @@ async function produceSubjectFile(bot, couseBaseInfo){
         
             let moduleType = 'video'
             
-            // 2.1 创建视频数据文件
-            createModuleFile( couseFullname, moduleType )
-            // 2.2 创建测单元验数据文件
-            moduleType = 'quiz'
-            createModuleFile( couseFullname, moduleType )
-            // 2.3 创建文章数据文件
-            moduleType = 'page'
-            createModuleFile( couseFullname, moduleType )
+            // // 2.1 创建视频数据文件
+            // createModuleFile( couseFullname, moduleType )
+            // // 2.2 创建测单元验数据文件
+            // moduleType = 'quiz'
+            // createModuleFile( couseFullname, moduleType )
+            // // 2.3 创建文章数据文件
+            // moduleType = 'page'
+            // createModuleFile( couseFullname, moduleType )
         
             // 3. 创建可执行文件, 文件的最后4个字符为课程号，
             //let couseFullname2 = `${couseBaseInfo.title}_${couseBaseInfo.code}`
@@ -813,5 +830,6 @@ module.exports = {
   handleGenSubject,
   handleGenAccounts,
   handleGenQuiz,
-  simpleLearn
+  simpleLearn,
+  parallelSimpleLearn
 }

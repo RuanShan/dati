@@ -13,7 +13,7 @@ async function scrollToBottom(page) {
   // 每秒500px
   // 需要检查路径是否在 http://anhui.ouchn.cn/ 下，animate可能不存在
   let url = await page.url()
-  let script = 'var timespan = Math.ceil(document.body.scrollHeight/500)*1000; $("html,body").animate({scrollTop: document.body.scrollHeight + "px"}, timespan);'
+  let script = 'var timespan = Math.ceil(document.body.scrollHeight/500)*1000; jQuery("html,body").animate({scrollTop: document.body.scrollHeight + "px"}, timespan);'
   if( url.indexOf( domain )<0){
     script = 'var timespan = Math.ceil(document.body.scrollHeight/500)*1000; window.scrollTo(0,document.body.scrollHeight);'
   }
@@ -151,6 +151,22 @@ async function handleDelay( delay = 500 ){
 }
 
 
+/**
+ * 整理title，清除 特殊字符 如：'/'
+ * @param {string} couseTitle 
+ */
+function buildCouseTitle( couseTitle ){
+  // 04391-习近平新时代中国特色社会主义思想
+  // 机械CAD/CAM
+  // cousetitle=计算机应用基础(本)   windowtitle = 计算机应用基础（本）
+  // "Photoshop图像处理".toLowerCase() => "photoshop图像处理"
+
+  let newTitle = couseTitle.replace(/^[\d_-\s]+/,'')
+  newTitle = newTitle.replace(/[\/\(\)（）]/g,'')
+  newTitle = newTitle.trim().toLowerCase()
+
+  return newTitle
+}
 
 module.exports = {
   getCourseNameByCode,
@@ -158,5 +174,6 @@ module.exports = {
   scrollToCenter,
   playVideo,
   handle503,
-  handleDelay
+  handleDelay,
+  buildCouseTitle
 }

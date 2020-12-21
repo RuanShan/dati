@@ -1,3 +1,6 @@
+## 可以学习的课程
+行政管理： 办公室管理
+
 ## 生成EXE文件
 pkg .
 
@@ -88,3 +91,5 @@ xcopy node_modules\puppeteer\.local-chromium\win64-818858\chrome-win\ chromium /
 
 
 https://stackoverflow.com/questions/59021700/passed-function-is-not-well-serializable
+
+

@@ -1,17 +1,8 @@
 const {
-  Builder,
-  By,
-  Key,
-  until
-} = require('selenium-webdriver');
-const path = require( 'path')
-const AppConfig = require( '../config')
-
-const {
-  getCourseNameByCode,
   scrollToBottom,
   playVideo,
-  handleDelay
+  handleDelay,
+  buildCouseTitle
 } = require('./utilplus')
 const fs = require('fs');
 const URL = require('url');
@@ -41,7 +32,7 @@ const CouseUrlMap = {
 
 
 const {
-  parseCouseBase,
+  parseCouse,
   handleQuizBase,
   copyQuizBase,
   copyQuizBaseByReview
@@ -108,51 +99,6 @@ class BotPlus {
   }
 
 
-
-  async readScore(couseTitle) {
-    let filename = await this.getCouseJsonPath(couseTitle)
-    let data = fs.readFileSync(filename, "utf-8")
-    if (data != null) {
-      let res = JSON.parse(data);
-      for (let i = 0; i < res.status.length; i++) {
-        let lesson = res.status[i];
-        let isFinish = lesson.isFinish;
-        let type = lesson.type
-
-        if (isFinish == '已完成' && type == 'quiz') {
-          let url = lesson.url
-
-          let xpath = "//div[@class='singlebutton quizstartbuttondiv']//button"
-          await this.driver.get(url)
-          await this.driver.wait(until.elementLocated(By.xpath(xpath)), 15000);
-
-          let scoreTable = await this.driver.findElements(By.tagName('table'))
-          let table_body = await scoreTable[0].findElements(By.tagName('tbody'))
-          let tr = await table_body[0].findElements(By.tagName('tr'))
-          for (let j = 0; j < tr.length; j++) {
-            let tr_Str = await tr[j].getText()
-            let infoList = tr_Str.split(' ')
-            console.log('infoList---:', infoList);
-            if (j == tr.length - 1 && infoList.length > 2) {
-              res.status[i].score = infoList
-            } else if (j == tr.length - 1 && infoList.length == 2) {
-              tr_Str = await tr[j - 1].getText()
-              infoList = tr_Str.split(' ')
-              res.status[i].score = infoList
-            }
-          }
-        }
-      }
-      this.couseInfo.status = res.status
-      fs.writeFile(filename, JSON.stringify(this.couseInfo), (err) => {
-        if (err) throw err;
-        console.log(`文件已被保存:${filename}`);
-      });
-    } else {
-      log.error(`无法读取课程数据文件 ${filename}`);
-    }
-  }
-
   /**
    * 登录账户 done
    * @param {Object} options - type - 学习某一类型的章节
@@ -186,25 +132,12 @@ class BotPlus {
       let url = await page.url()
 
       if(url.startsWith('http://passport.ouchn.cn')){
-        log.error(`登录失败 ${username}!!`);
+        log.error(`登录失败 ${username}`);
       } else{
-        log.info('登录成功');
+        log.info(`登录成功 ${username}`);
         success = true
         await page.goto('http://student.ouchn.cn/')
       }
-      
-      // await driver.wait(until.titleContains('学生空间'), 10000).
-      // then(async ()=>{
-      //   await driver.wait(until.titleContains('学生空间'), 10000);
-      //   await driver.get('http://student.ouchn.cn/')
-      // }).catch(async ()=>{
-      // // 偶尔可能没有反应，直接进入学生主页，等待10秒
-      //   await driver.get('http://student.ouchn.cn/')
-      //   await driver.wait(until.titleContains('学生空间'), 10000);
-      // })
-
-      // 用于打开其它窗口后，再回来打开其它课程
-      //this.mainHandle = await driver.getWindowHandle()
 
     } catch (e) {
       log.error('登录异常', e);
@@ -272,7 +205,7 @@ class BotPlus {
         // 每学完一课，更新一下数据文件
         lesson.isFinish = isFinish
         if (isFinish == '完成') {
-          this.saveCouseJson(this.couseTitle)
+          //this.saveCouseJson(this.couseTitle)
         }
       }catch(e){
         log.error( `无法学习课程 ${lesson.title} url=${url} account=${this.username} `,e)
@@ -298,7 +231,7 @@ class BotPlus {
       let url = lesson.url
       // 看视频无需url
       // if (url.length == 0) {
-      //   console.debug(`小节 ${title} 没有 url`);
+      //   log.debug(`小节 ${title} 没有 url`);
       //   continue
       // }
       if (isFinish == '未完成' && lesson.id == moduleCode) {
@@ -307,7 +240,7 @@ class BotPlus {
         // 文本: mod/page/view
         // 专题测验：mod/quiz/view
         // 考核说明：mod/resource/view, 重定向到pdf
-        console.debug(`类型 ${type} 小节 ${title} `);
+        log.debug(`类型 ${type} 小节 ${title} `);
         if (type == 'video') {
           //http://anhui.ouchn.cn/course/view.php?id=4257&sectionid=91623&mid=561704
           success = await this.watchVideoByApi(lesson)
@@ -324,7 +257,7 @@ class BotPlus {
 
 
     }
-    console.debug(` 小节 ${moduleCode} 学习结束 ${success} `);
+    log.debug(` 小节 ${moduleCode} 学习结束 ${success} `);
 
     return success
   }
@@ -342,24 +275,24 @@ class BotPlus {
       let title = lesson.title
 
       let page = await driver.get(url);
-      console.debug(`before reading ${ title}`);
+      log.debug(`before reading ${ title}`);
       await scrollToBottom(page)
       
-      console.debug(`after reading${ title}`);
+      log.debug(`after reading${ title}`);
 
     }
 
   }
 
   async watchVideo(lesson) {
-    console.log('==================watchVideo=================');
+    log.log('==================watchVideo=================');
     let success = true
     let driver = this.driver
     let isFinish = lesson.isFinish;
     let id = lesson.id
 
     if (isFinish == '未完成') {
-      console.log('course-----:', lesson);
+      log.log('course-----:', lesson);
       let url = lesson.url
       let title = lesson.title
       await driver.get(url);
@@ -368,10 +301,10 @@ class BotPlus {
       try {
         let canvas = await driver.findElement(By.tagName('canvas'))
         await driver.wait(playVideo(driver, canvas), 100000000);
-        console.log('视频播放成功');
+        log.log('视频播放成功');
       } catch (ex) {
         success = false
-        console.error('视频播放失败：' + id, ex);
+        log.error('视频播放失败：' + id, ex);
       }
     }
 
@@ -386,7 +319,7 @@ class BotPlus {
     let id = lesson.id
 
     if (isFinish == '未完成') {
-      console.log('course-----:', lesson);
+
       //let url = lesson.url
       let lessonTitle = lesson.title
       let {
@@ -402,7 +335,7 @@ class BotPlus {
       let answsers = json.answers
       // 加载题库文件
 
-      console.log('this.couseTitle---:', this.couseTitle);
+      log.log('this.couseTitle---:', this.couseTitle);
       if (title == '习近平新时代中国特色社会主义思想') {
         await handleQuizBase(driver, url, options, answsers, num )
       } else if (title == '国家开放大学学习指南') {
@@ -418,14 +351,14 @@ class BotPlus {
       } else  {  
         await handleQuizBase(driver, url, options, answsers, num )
       }
-      console.log('this quiz is done');
+      log.log('this quiz is done');
     }
 
 
   }
 
   async goFinal(lesson, options) {
-    console.log('=================goFinal=================');
+    log.log('=================goFinal=================');
     let driver = this.driver
 
     let isFinish = lesson.isFinish;
@@ -441,11 +374,11 @@ class BotPlus {
     // 等待commit的click功能
     await commitButton.click()
     await handleDelay(300);
-    console.debug("编辑按钮")
+    log.debug("编辑按钮")
 
     // 可能会超时，需要重新加载
     await page.waitForSelector('iframe', {timeout:45000}).catch(async(e)=>{
-      console.error( " TimeoutError: waiting for selector iframe", e)
+      log.error( " TimeoutError: waiting for selector iframe", e)
       await page.reload()
     }); 
 
@@ -483,24 +416,23 @@ class BotPlus {
     if( options.submitfinal == 'yes'){
       let submitButtonCss = '.submissionaction:last-child form button.btn-secondary'
       await page.waitForSelector(submitButtonCss);
-      console.debug("查找提交按钮")
       const submitButton = await page.$(submitButtonCss)
       await submitButton.click()
-      console.debug("点击提交按钮")
+      log.debug("点击提交按钮")
       let confirmButtonCss = '.submitconfirm #id_submitbutton'
       await page.waitForSelector(confirmButtonCss);
       const confirmButton = await page.$( confirmButtonCss )
       await confirmButton.click()
       // 延时以免数据没有提交成功
       await handleDelay(300);
-      console.debug("点击确认按钮")
+      log.debug("点击确认按钮")
     }
 
   }
 
   // 通过api去看视频
   async watchVideoByApi(lesson) {
-    // $.getJSON('http://shenyang.ouchn.cn/theme/blueonionre/modulesCompletion.php?cmid=437329&id=3935&sectionid=27', function(res){ console.log(res)})
+    // $.getJSON('http://shenyang.ouchn.cn/theme/blueonionre/modulesCompletion.php?cmid=437329&id=3935&sectionid=27', function(res){ log.log(res)})
 
     let success = false
     let course = CouseUrlMap[this.couseTitle]
@@ -532,12 +464,56 @@ class BotPlus {
 
       }
     }
-
     return success
-
 
   }
 
+    // 通过api去看视频
+    async watchAllVideoByApi() {
+      // $.getJSON('http://shenyang.ouchn.cn/theme/blueonionre/modulesCompletion.php?cmid=437329&id=3935&sectionid=27', function(res){ log.log(res)})
+      let driver = this.driver
+
+      let success = false
+      let course = CouseUrlMap[this.couseTitle]
+      let host = course.host
+      let moduleStatus = this.couseInfo.status
+      let videoLessons = []
+      for (let i = 0; i < moduleStatus.length; i++) {
+        let lesson = moduleStatus[i];
+        let url = lesson.url
+        let type = lesson.type
+
+        if (type == 'video') {
+          videoLessons.push( lesson  )
+        }
+      }
+
+      let page = null
+      try {
+        for (let i = 0; i < videoLessons.length; i++) {
+
+          let {id,classId,sectionId } = videoLessons[i]
+          if( i == 0 ){
+            page = await driver.get(`http://${host}/mod/url/view.php?id=${id}`);      
+            await page.waitForSelector('#video');
+          }
+          let script = `jQuery.ajaxSetup({ async : false}); var res = null; jQuery.getJSON('/theme/blueonionre/modulesCompletion.php?cmid=${id}&id=${classId}&sectionid=${sectionId}', function(data){ res = data; }); ;`
+          // "视频播放延时1秒, 防止API没有成功！"
+          let res = await page.evaluate(script);
+          await handleDelay(300);
+          success = (res == 1)
+
+        }
+      } catch (ex) {
+            
+        handleBotError( this, ex )
+
+      }
+       
+      log.info(`视频播放成功 ${success}`);
+       
+      return success
+    }
 
   /**
    * 生成测验题库 
@@ -623,7 +599,7 @@ class BotPlus {
     }
     let answerjson = `db/answers/${fullname}.json`
 
-    // console.log( "answerjson", answerjson)
+    // log.log( "answerjson", answerjson)
     fs.writeFileSync(answerjson, JSON.stringify({ answers: answerList}));
 
   }
@@ -638,7 +614,7 @@ class BotPlus {
   async prepareForLearn(couseTitle) {
 
     // 处理 “4498_中国特色社会主义理论体系概论” 情况, 避免 "人文英语3" 中的3被清除
-    couseTitle = couseTitle.replace(/^[\d_-\s]+/, '')
+    couseTitle = buildCouseTitle(couseTitle)
     let driver = this.driver
     let browser = driver.browser
     let mainPage = this.mainPage //await driver.getWindowHandle()
@@ -663,7 +639,6 @@ class BotPlus {
         // 等待页面加载成功，title包含 ‘课程’
 
         // 需要等待页面加载完成，即标题有中包含 课程
-        //await driver.wait(until.titleContains('课程'));
         let windowTitle = await cousePage.title() // 课程： 习近平新时代中国特色社会主义思想
         url = await cousePage.url() //http://shenyang.ouchn.cn/course/view.php?id=4372
         let parsedUrl = URL.parse(url, true)
@@ -672,8 +647,8 @@ class BotPlus {
         // cousetitle=计算机应用基础(本)   windowtitle = 计算机应用基础（本）
         //   "Photoshop图像处理".toLowerCase() => "photoshop图像处理"
 
-        let tidyWindowTitle = windowTitle.replace(/[\(\)（）]/g, '').toLowerCase()
-        let tidyCouseTitle = couseTitle.replace(/[\(\)（）]/g, '').toLowerCase()
+        let tidyWindowTitle = buildCouseTitle(windowTitle)
+        let tidyCouseTitle = couseTitle
         
         //log.debug(`couseTitle=${couseTitle} windowTitle = ${windowTitle}, url= ${url} code=${code} tidyWindowTitle=${tidyWindowTitle} tidyCouseTitle=${tidyCouseTitle}`);
 
@@ -703,8 +678,8 @@ class BotPlus {
 
   async learnFinal(options) {
 
-    console.log( "============= learnFinal =============")
-    console.log( "this.couseInfo.status", this.couseInfo.status.length)
+    log.log( "============= learnFinal =============")
+    log.log( "this.couseInfo.status", this.couseInfo.status.length)
 
     let moduleStatus = this.couseInfo.status
     
@@ -726,7 +701,7 @@ class BotPlus {
   //
   //   let code = await getVerifyCode(driver)
   //   let text = /[\w]+/.exec(code.text).toString()
-  //   console.log("text=", text)
+  //   log.log("text=", text)
   //   await driver.findElement(By.id('checkCode')).sendKeys(text);
   //   await driver.findElement(By.id('btnLogin')).click()
   //
@@ -734,15 +709,14 @@ class BotPlus {
 
   // 生成某一门课的db log，需要知道这门课的url
   async profileCouse(courseCodeOrTitle) {
-    console.log( "============= profileCouse0 =============")
-
+    
     // 毛泽东思想和中国特色社会主义理论体系概论, 统计学原理   思想道德修养与法律基础  管理学基础
     //  经济数学基础  计算机应用基础
     this.couseTitle = courseCodeOrTitle || this.couseTitle
     // 有时传过来的参数 前面有空格，导致后面匹配不上对应的课程信息
-    this.couseTitle = this.couseTitle.replace(/^[\d_-\s]+/, '')
+    this.couseTitle = this.couseTitle
 
-    console.debug("profileCouse=", courseCodeOrTitle, CouseUrlMap);
+    log.debug("profileCouse=", courseCodeOrTitle, CouseUrlMap);
     let couse = null
     if (courseCodeOrTitle) {
       couse = CouseUrlMap[courseCodeOrTitle]
@@ -761,16 +735,21 @@ class BotPlus {
       let startAt = new Date()
       let cousePage = await this.driver.get(url)
       let windowTitle = await cousePage.title()
+      let snapshot = `./db/log/initdb/${this.couseTitle}.jpg`
+      handleSnapshot( this, cousePage,snapshot)
+      log.debug(" tab.title1 ", title, this.couseTitle, typeof(this.couseTitle))
 
-      console.log(" tab.title1 ", title, this.couseTitle, typeof(this.couseTitle))
+      // let bybase = [ '国家开放大学学习指南','思想道德修养与法律基础','马克思主义基本原理概论','毛泽东思想和中国特色社会主义理论体系概论','中国特色社会主义理论体系概论','习近平新时代中国特色社会主义思想', '中国近现代史纲要']
+      // let bybase2= [ '幼儿园课程论', '人文社会科学基础', '学前教育学', '学前儿童发展心理学', '儿童家庭与社区教育', '幼儿园管理','商务礼仪概论' ]
+      // if (bybase.includes(title)) {
+      //   this.couseInfo = await parseCouseBase(cousePage)
+      // } else if (bybase2.includes(title)) {
+      //   this.couseInfo = await parseCouseBase2(cousePage)
+      // } else{
+      //   this.couseInfo = await parseCouseBase(cousePage)
+      // }
 
-      let bybase = [ '国家开放大学学习指南','思想道德修养与法律基础','马克思主义基本原理概论','毛泽东思想和中国特色社会主义理论体系概论','中国特色社会主义理论体系概论','习近平新时代中国特色社会主义思想', '中国近现代史纲要']
-      
-      if (bybase.includes(title)) {
-        this.couseInfo = await parseCouseBase(cousePage)
-      } else{
-        this.couseInfo = await parseCouseBase(cousePage)
-      }
+      this.couseInfo = await parseCouse(cousePage) 
 
       let position = 0;
       for (let i = 0; i < this.couseInfo.status.length; i++) {
@@ -787,9 +766,8 @@ class BotPlus {
       // 无需关闭，每次driver都用第一个tab打开，如果关闭，browser会关闭
       // await cousePage.close();
     } else {
-      console.debug(`课程代码 ${ this.couseTitle} ${courseCodeOrTitle} 找不到课程url`);
+      log.debug(`课程代码 ${ this.couseTitle} ${courseCodeOrTitle} 找不到课程url`);
     }
-    console.log( "============= profileCouse1 =============")
 
     return this.couseInfo
   }
@@ -814,7 +792,7 @@ class BotPlus {
         //   title="★中级财务会计（一）"  couseTitle = "中级财务会计（一）"
         //   "Photoshop图像处理".toLowerCase() => "photoshop图像处理"
 
-        title = title.toLowerCase()
+        title = buildCouseTitle( title )
         //log.debug("getCousesLinks couse=", title, title.includes(couseTitle));
         if (title.includes(couseTitle)) {
           links.push(buttonElement)
@@ -830,17 +808,19 @@ class BotPlus {
 
   async saveCouseJson(classId) {
     let filename = await this.getCouseJsonPath(classId)
-    //console.log('this.couseInfo----:',this.couseInfo);
+    //log.log('this.couseInfo----:',this.couseInfo);
     // 保存 课程信息时只保存status 即每一课的信息，以便和快速开视频使用相同的结构的文件
-    //fs.writeFileSync(filename, JSON.stringify(this.couseInfo.status) );
+    fs.writeFileSync(filename, JSON.stringify(this.couseInfo.status) );
   }
 
   async getCouseJsonPath(couseTitle) {
-    let dir = './db/students'
+    let couse = CouseUrlMap[couseTitle]
+    let fullname = `${couse.title}_${couse.code}`
+    let dir = './db/subjects'
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir)
     }
-    let filename = dir + '/' + this.username + '_' + couseTitle + '.json'
+    let filename = dir + '/' + fullname+ '.json'
     return filename
   }
 
@@ -891,15 +871,15 @@ class BotPlus {
         }
       }
       if (filename ) {
-        console.log( "课程测验答案",filename)
+        log.log( "课程测验答案",filename)
         fs.writeFileSync(filename, JSON.stringify({
           answers: jsonStr
         }));
       } else {
-        console.log(`没有课程测验答案:${couseTitle}`);
+        log.log(`没有课程测验答案:${couseTitle}`);
       }
     } else {
-      console.error(`无法找到课程:${couseTitle}`);
+      log.error(`无法找到课程:${couseTitle}`);
 
     }
 
@@ -915,7 +895,7 @@ class BotPlus {
      await page.waitForSelector( '#zaixuekecheng');
     let div = await page.$( '#zaixuekecheng');
     let couses = await page.$$( '#zaixuekecheng .media' );
-    console.debug("getSummary couses=", couses.length);
+    log.debug("getSummary couses=", couses.length);
     for (let i = 0; i < couses.length; i++) {
       let couse = couses[i]
       let title = await couse.$eval( '.media-title', node => node.innerText);
@@ -934,7 +914,7 @@ class BotPlus {
         sumary.username = this.username
         sumary.todo = todo
         sumary.score = score
-        console.debug("getSummary couse=", title, text, todo, score);
+        log.debug("getSummary couse=", title, text, todo, score);
         summaries.push(sumary)
       }
     }
@@ -952,7 +932,7 @@ class BotPlus {
 
     // for (let i = 0; i < handles.length; i++) {
     //   let handle = handles[i]
-    //   console.log("mainHandle0", i, mainHandle, "handle = ", handle)
+    //   log.log("mainHandle0", i, mainHandle, "handle = ", handle)
     //   if (mainHandle != handle) {
     //     try {
     //       await locator.window(handle)
@@ -965,13 +945,13 @@ class BotPlus {
 
     //       await driver.close()
     //     } catch (e) {
-    //       console.error("driver.close", e);
+    //       log.error("driver.close", e);
     //     }
     //   }
     // }
     // await locator.window(mainHandle)
     // await driver.wait(until.titleContains('学生空间'), 20000);
-    // console.debug("closeOtherTabs1");
+    // log.debug("closeOtherTabs1");
    
   }
 
@@ -981,7 +961,9 @@ class BotPlus {
    */
   getSubjectDataFilePath( couseBaseInfo ){
     let couseFullname = `${couseBaseInfo.title}_${couseBaseInfo.code}`
-    let subjectfile =  path.join( AppConfig.appPath, `./db/subjects/${couseFullname}.json`)
+    // Error: File or directory 'D:\**\dati\db\subjects\毛泽东思想和中国特色社会主义理论体系概论_5771.json' was not included into executable at compilation stage. Please recompile adding it as asset or script.
+    //let subjectfile =  path.join( AppConfig.appPath, `./db/subjects/${couseFullname}.json`)
+    let subjectfile =  `./db/subjects/${couseFullname}.json`
     return subjectfile
   }
 
@@ -1005,7 +987,7 @@ class BotPlus {
       if (data != null) {
 
         let res = JSON.parse(data);
-        console.info(`读取课程数据 ${couseTitle}`);
+        log.info(`读取课程数据 ${couseTitle}`);
         this.courseInfo.status = res;
       }
     } else {
@@ -1029,6 +1011,14 @@ async function handleBotError( bot, e ){
 
   }
 }
+
+async function handleSnapshot( bot, page, path ){
+  let { username,couseTitle } = bot 
+  //let path = `./db/log/${couseTitle}_${username}.jpg`
+  await page.screenshot({type: 'jpeg', path: path})
+  
+}
+
 
 module.exports = {
   BotPlus
