@@ -26,7 +26,9 @@ const {
   handleGenSubject,
   handleGenAccounts,
   handleGenQuiz,
-  simpleLearn
+  handleSubmitPlainQuiz,
+  simpleLearn,
+  getAllCouses
 } = require('./src/indexplus')
 
 
@@ -61,8 +63,9 @@ program.command('simplelearn')
     }
     let type = ( program.type || null)
     let submitquiz = ( program.submitquiz || null)
+    let submitfinal = ( program.submitfinal || null)
     
-    let options = { type, submitquiz }
+    let options = { type, submitquiz, submitfinal }
     let accounts = await getAccounts()  
        
     await simpleLearn(accounts, options)
@@ -251,15 +254,58 @@ program.command('genaccount')
     await  handleGenAccounts(accounts  )
 })
 
-program.command( 'genquiz [byreview]')  
+program.command( 'genquiz')  
 .description('生成测验数据文件')
-.action(async function( byreview) {
+.action(async function(  ) {
    
   let accounts = await getAccounts( )
 
-  console.log( "byreview=", byreview)
-  byreview = 'byreview'
-  handleGenQuiz(accounts, byreview)
+  console.log( "byreview=",  )
+  let byreview = 'byreview'
+
+  await handleGenQuiz(accounts, { byreview })
+
+})
+
+program.command( 'genxingkao')  
+.description('生成形考测验数据文件')
+.action(async function(  ) {
+   
+  let accounts = await getAccounts( )
+ 
+  filter = 'xingkao'
+
+  await handleGenQuiz(accounts, { filter })
+
+})
+
+program.command( 'submitquiz')  
+.description('提交空白测试')
+.action(async function(  ) {
+   
+  let accounts = await getAccounts( )
+ 
+  await handleSubmitPlainQuiz(accounts,  )
+
+})
+
+// 获取账号的所有课程数据信息
+program.command( 'getcouses')  
+.description('生成账号课程文件')
+.action(async function(  ) {
+   
+  let accounts = await getAccounts( )
+
+  let students = await getAllCouses(accounts)
+
+  let filename = `./students-${(new Date).getTime()}.csv`
+
+  console.log( "before save to file:", filename  )
+  //fs.writeFileSync(filename, JSON.stringify(sumaries))
+  const csv = stringify(students, {header: true, columns:[  'username', 'password', 'major', 'couses']},  function(err, records){
+    fs.writeFileSync(filename, records)
+    console.log( "after save to file:", filename )
+  })
 
 })
 
@@ -272,11 +318,11 @@ program.command( 'parsecsv <filename>')
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 async function loadConfig(){
-  // 
+  // 路径无法使用，打包后是虚拟路径，程序内部应使用相对路径
   config.appPath = __dirname;
   config.subjectPath = path.join(config.appPath, '/db/subjects' )
 }
-loadConfig();
+// loadConfig();
 program.parse(process.argv);
 
  
@@ -307,26 +353,7 @@ async function getAccounts(accountfile=null) {
   return accounts
 }
 
-async function getModuleIds(course) {
-  let moduleids = []
-
-  let filename = `./db/subjects/${course}_${program.type}_module.json`
-
-  try {
-    let data = fs.readFileSync(filename, "utf-8")
-    if (data != null) {
-
-      moduleids = JSON.parse(data);
-
-    } else {
-      console.error(`无法读取数据文件 ${filename}`);
-    }
-  } catch (ex) {
-    console.error(`无法读取数据文件 ${filename}`, ex);
-  }
-
-  return moduleids
-}
+ 
 
 async function getAccountsJsonByKey(filename) {
   console.log('==============getAccountsJsonByKey==============');
@@ -404,9 +431,9 @@ console.log( `accounts = ${accounts.length}`)
         for( let i=0; i<accounts.length; i++){
           let account = accounts[i]
 
-          let {realname, username, password, subjects} = account
+          let {major, username, password, subjects} = account
 
-          let subjectArray = subjects.split( '、')
+          let subjectArray = subjects.split( ',')
 
           for( let j = 0; j<subjectArray.length; j++){            
             let subject = subjectArray[j]
@@ -414,7 +441,7 @@ console.log( `accounts = ${accounts.length}`)
             if( subject.length == 0){
               continue;
             }
-            let account = {realname, username, password, subject}
+            let account = {major, username, password, subject}
 
             if( !uniqSubjects.includes(subject)){
               uniqSubjects.push( subject )
@@ -424,14 +451,16 @@ console.log( `accounts = ${accounts.length}`)
           }
         }
 
-        let newfilename = 'subjects2.csv'
-        const csv = stringify(newAccounts, { header: true, columns:['realname', 'username', 'password', 'subject']}, function(err, records){
+        let newfilename = 'subjects02.csv'
+
+        let sortedAccounts = newAccounts.sort( (a,b)=> a.subject==b.subject ? 0 : ((a.subject>b.subject) ? 1: -1) )
+        const csv = stringify(sortedAccounts, { header: true, columns:['username', 'password','major', 'subject']}, function(err, records){
           fs.writeFileSync(newfilename, records)
           console.log( "after save to file:", newfilename )
         })
 
-        let newfilename2 = 'subjects1.csv'
-        const csv2 = stringify(uniqSubjectAccounts, {header: true, columns:['realname', 'username', 'password', 'subject']}, function(err, records){
+        let newfilename2 = 'subjects01.csv'
+        const csv2 = stringify(uniqSubjectAccounts, {header: true, columns:['username', 'password','major', 'subject']}, function(err, records){
           fs.writeFileSync(newfilename2, records)
           console.log( "after save to file:", newfilename2 )
         })

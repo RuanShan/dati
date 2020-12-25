@@ -2,7 +2,8 @@ const {
   scrollToBottom,
   playVideo,
   handleDelay,
-  buildCouseTitle
+  buildCouseTitle,
+  isXingkaoLessonTitle
 } = require('./utilplus')
 const fs = require('fs');
 const URL = require('url');
@@ -35,7 +36,8 @@ const {
   parseCouse,
   handleQuizBase,
   copyQuizBase,
-  copyQuizBaseByReview
+  copyQuizBaseByReview,
+  submitPlainQuizBase
 } = require('./couses/baseplus')
 
 class BotPlus {
@@ -160,7 +162,7 @@ class BotPlus {
     
     
     let typeFilter = options.type
-    let lessionIndex = options.lessionIndex || 0
+
     log.debug( `课程学习中 ${this.couseTitle}`, '参数', options )
     
    
@@ -169,16 +171,18 @@ class BotPlus {
 
     for (let i = 0; i < moduleStatus.length; i++) {
       let lesson = moduleStatus[i];
-      let isFinish = lesson.isFinish;
-      let url = lesson.url
-      let type = lesson.type
+      let { isFinish, url, type, title } = lesson;
        
-      if( i< lessionIndex ){
+       
+ 
+
+      if( typeFilter == 'xingkao' && !isXingkaoLessonTitle( title ) ){
+        continue
+
+      }else  if (  typeFilter != type) {
         continue
       }
-      if (typeFilter && typeFilter != type) {
-        continue
-      }
+      
       try{
        
         let title = lesson.title
@@ -190,12 +194,21 @@ class BotPlus {
           if (success) {
             isFinish = '完成'
           }
-        } else if (url.includes('/mod/page/view')) {
-          await this.readText(lesson)
-          isFinish = '完成'
+        } else if (type=='page') {
+
+          if(url.includes('/mod/page/view')){
+            await this.readText(lesson)
+            isFinish = '完成'
+          }
+
         } else if (type == 'quiz') {
           // 只有类型为答题时，再答题，以免多次答题
-          if (typeFilter == type) {            
+          if (typeFilter == 'xingkao') {
+            if( isXingkaoLessonTitle( title )){
+              await this.goXingkao(lesson, lesson.position, options)
+            }
+          }else
+          {            
             await this.goQuiz(lesson, lesson.position, options)
             isFinish = '完成'
           }
@@ -318,7 +331,6 @@ class BotPlus {
     let isFinish = lesson.isFinish;
     let id = lesson.id
 
-    if (isFinish == '未完成') {
 
       //let url = lesson.url
       let lessonTitle = lesson.title
@@ -352,13 +364,39 @@ class BotPlus {
         await handleQuizBase(driver, url, options, answsers, num )
       }
       log.log('this quiz is done');
-    }
+  }
+
+  async goXingkao( ) {
+    let driver = this.driver
+
+    let isFinish = lesson.isFinish;
+    let id = lesson.id
 
 
+      //let url = lesson.url
+      let lessonTitle = lesson.title
+      let {
+        title,
+        code,
+        host
+      } = CouseUrlMap[this.couseTitle]
+      let url = `http://${host}/mod/quiz/view.php?id=${id}`
+
+      let fullname = `${title}_${code}`
+      let answerfile = `./db/answers/${fullname}.json`
+      let json = JSON.parse(fs.readFileSync(answerfile,'utf8'));
+      let answsers = json.answers
+      // 加载题库文件
+
+      log.log('this.couseTitle---:', this.couseTitle);
+ 
+        await handleQuizBase(driver, url, options, answsers, num )
+      
+      log.log('this quiz is done');
   }
 
   async goFinal(lesson, options) {
-    log.log('=================goFinal=================');
+    log.debug('=================goFinal=================', options);
     let driver = this.driver
 
     let isFinish = lesson.isFinish;
@@ -368,6 +406,12 @@ class BotPlus {
 
     
     let page = await driver.get(url)
+    let submitted = await page.$( '.submissionstatussubmitted')
+
+    if( submitted){
+      log.info("作业已经提交")
+      return
+    }
 
     await page.waitForSelector( '.singlebutton button.btn-secondary');
     const commitButton = await page.$( '.singlebutton button.btn-secondary')
@@ -516,11 +560,103 @@ class BotPlus {
     }
 
   /**
-   * 生成测验题库 
+   * 生成单元测验题，针对可以重复提交，并显示答案的科目 byreview
    * 调用前需先调用 
    * @param {string} couseTitle -  如：“中国特色社会主义理论体系概论”
   */
-  async copyQuiz( couseTitle, byreview = false ) {
+  async copyQuiz( couseTitle, options={}  ) {
+
+    let { byreview, filter} = options
+    await this.prepareForLearn( couseTitle )
+
+    let {
+      title,
+      code,
+      host
+    } = CouseUrlMap[couseTitle]
+    filter = filter || ''
+    let fullname = `${title}_${code}`
+    let filename = `db/subjects/${fullname}.json`
+    // 加载课程数据文件
+    this.getLog( couseTitle, { filename } )
+    
+
+    let urlbase = `http://${host}/mod/quiz/view.php`
+    
+    let lessons = this.couseInfo.status
+    
+    let quizArray = []
+    
+    if( byreview ) {
+      quizArray = await copyQuizBaseByReview( this.driver, urlbase, lessons )
+    }else{
+      quizArray = await copyQuizBase( this.driver, urlbase, lessons, filter )
+    }
+      // 生成试题文件
+    let answerfile = `db/answers/${fullname}${filter}.txt`
+
+    let answerStr = ''
+    let LE =  "\r\n"
+    for( let i=0; i<quizArray.length; i++){
+      let quiz = quizArray[i];
+      answerStr = answerStr.concat( `形考${(i+1)} ${LE}` )
+      for( let j = 0; j<quiz.length; j++ ){
+        let question = quiz[j]
+        let { title, options, type, answer, subquetions, classType} = question
+
+        let line = ''
+        if( classType =='description'){
+          line =  title + LE
+        }else if( classType == 'multichoice'){
+          line =  `问题[${classType}] ${title} ${LE}${options} ${LE}答案 ${answer} ${LE}`
+        }else if( classType == 'truefalse'){
+          line =  `问题[${classType}] ${title} ${LE}${options} ${LE}答案 ${answer} ${LE}`
+        }else if( classType == 'multianswer'){
+          line =  `问题[${classType}] ${title} ${LE}${subquetions} ${LE}答案 ${answer} ${LE}`
+        }
+
+        answerStr = answerStr.concat( line )
+      }
+    }
+
+    fs.writeFileSync(answerfile, answerStr);
+
+    let answerList = []
+    for( let i=0; i<quizArray.length; i++){
+      let quiz = quizArray[i];
+      // 有时为空，需要跳过
+      answerList[i] = []
+
+      for( let j = 0; j<quiz.length; j++ ){
+        let question = quiz[j]
+        let { title, options, type, answer, classType} = question
+        log.debug("classType=",classType, "i=",i, "j=",j,title)
+        
+        if( classType == 'multichoice'){
+          answerList[i].push( { title, answer })
+          
+        }else if( classType == 'truefalse'){
+          answerList[i].push( { title, answer })
+        }
+
+      }
+    }
+    let answerjson = `db/answers/${fullname}${filter}.json`
+
+    // 如果是形考题，并且原有题库，把新题添加到原有题库中
+
+    // log.log( "answerjson", answerjson)
+    fs.writeFileSync(answerjson, JSON.stringify({ answers: answerList}));
+
+  }
+
+
+  /**
+     * 提交空白的测验题库 
+     * 调用前需先调用 
+     * @param {string} couseTitle -  如：“中国特色社会主义理论体系概论”
+    */
+  async submitPlainQuiz( couseTitle  ) {
 
     await this.prepareForLearn( couseTitle )
 
@@ -540,69 +676,11 @@ class BotPlus {
     
     let lessons = this.couseInfo.status
     
-    let quizArray = []
     
-    if( byreview ) {
-      quizArray = await copyQuizBaseByReview( this.driver, urlbase, lessons )
-    }else{
-      quizArray = await copyQuizBase( this.driver, urlbase, lessons )
-    }
-      // 生成试题文件
-    let answerfile = `db/answers/${fullname}.txt`
-
-    let answerStr = ''
-    let LE =  "\r\n"
-    for( let i=0; i<quizArray.length; i++){
-      let quiz = quizArray[i];
-      answerStr = answerStr.concat( `形考${(i+1)} ${LE}` )
-      for( let j = 0; j<quiz.length; j++ ){
-        let question = quiz[j]
-        let { title, options, type, answer} = question
-
-        let line = ''
-        if( type =='h1'){
-          line =  title + LE
-        }else if( type == 'select'){
-          line =  `问题 ${title} ${LE}${options} ${LE}答案 ${answer} ${LE}`
-        }else if( type == 'tof'){
-          line =  `问题 ${title} ${LE}${options} ${LE}答案 ${answer} ${LE}`
-        }
-
-        answerStr = answerStr.concat( line )
-      }
-    }
-
-    fs.writeFileSync(answerfile, answerStr);
-
-    let answerList = []
-    for( let i=0; i<quizArray.length; i++){
-      let quiz = quizArray[i];
-      // 有时为空，需要跳过
-      answerList[i] = []
-      let level2 = 0
-      for( let j = 0; j<quiz.length; j++ ){
-        let question = quiz[j]
-        let { title, options, type, answer} = question
-        
-        if( type =='h1'){
-          
-          answerList[i][level2] = []
-          level2+=1
-        }else if( type == 'select'){
-          answerList[i][level2-1].push( { title, answer })
-          
-        }else if( type == 'tof'){
-          answerList[i][level2-1].push( { title, answer })
-        }
-
-      }
-    }
-    let answerjson = `db/answers/${fullname}.json`
-
-    // log.log( "answerjson", answerjson)
-    fs.writeFileSync(answerjson, JSON.stringify({ answers: answerList}));
-
+    await submitPlainQuizBase( this.driver, urlbase, lessons )
+     
   }
+
 
   /**
    * 确定当前课程的url 和 code
@@ -804,6 +882,52 @@ class BotPlus {
     }
     // 不知因为什么原因会多一个, 可能是angular生成的隐藏button对象，
     return links
+  }
+
+  async getAllCouses(page) {
+
+    
+    // 支持的课程
+    let links = []
+    try{
+    
+      await page.waitForSelector('#zaixuekecheng .media');
+      let div = await page.$('#zaixuekecheng');
+      let couses = await page.$$('#zaixuekecheng .media');
+      //log.debug("getCousesLinks couses=", couseTitle, couses.length);
+      for (let i = 0; i < couses.length; i++) {
+        let couse = couses[i]
+        //let titleElement = await couse.$eval('.media-title', node=> node.innerText );
+        let title =  await couse.$eval('.media-title', node=> node.innerText );
+        let buttonElement = await couse.$('.course-entry button');
+        //let text =  await couse.$eval('.course-entry button', node=>node.innerText );
+        //   title="★中级财务会计（一）"  couseTitle = "中级财务会计（一）"
+        //   "Photoshop图像处理".toLowerCase() => "photoshop图像处理"
+
+        title = buildCouseTitle( title )
+        //log.debug("getCousesLinks couse=", title, title.includes(couseTitle));
+        links.push(title)
+        
+      }
+
+    }catch(e){
+      handleBotError( this, e)
+    }
+    // 不知因为什么原因会多一个, 可能是angular生成的隐藏button对象，
+    return links
+  }
+
+  async getMajorInfo(   ){
+    let url = 'http://student.ouchn.cn/#/discover-more/student-status'
+
+    let page = await this.driver.get( url )
+    let css = '.page-content .student-roll .col-md-6:nth-child(2)'
+    await page.waitForSelector('.page-content .student-roll');
+
+    let title =  await page.$eval(css, node=> node.innerText );
+    title =  title.replace( /[\n\t\r]+/, '')
+    return { title }
+
   }
 
   async saveCouseJson(classId) {

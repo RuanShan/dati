@@ -375,7 +375,7 @@ async function handleLearnModuleOfAccounts2(accounts, courseCode, moduleCodes, o
  * 生成题库文件
  * @param {[]} accounts { username, password, code }
  */
-async function handleGenQuiz(accounts, byreview){
+async function handleGenQuiz(accounts, options={}){
   let driver = new PuppeteerDriver();
 
   let bot = new Bot(driver )
@@ -390,7 +390,33 @@ async function handleGenQuiz(accounts, byreview){
       continue
     }
     await bot.login( username, password )
-    await bot.copyQuiz( subject, byreview )
+    await bot.copyQuiz( subject, options )
+    await bot.logout()
+
+  }
+  await driver.quit()
+}
+
+/**
+ * 提交空白题库，以便下一步生成题库文件
+ * @param {[]} accounts { username, password, subject }
+ */
+async function handleSubmitPlainQuiz(accounts){
+  let driver = new PuppeteerDriver();
+
+  let bot = new Bot(driver )
+  console.debug("开始学习小节, 人数=", accounts.length)
+
+  for (let i = 0; i < accounts.length; i++) {
+    let account = accounts[i]
+    let { username, password, subject} = account
+    
+
+    if( !username || !password || !subject){
+      continue
+    }
+    await bot.login( username, password )
+    await bot.submitPlainQuiz( subject )
     await bot.logout()
 
   }
@@ -520,20 +546,37 @@ async function simpleLearn(accounts, options={}) {
 }
 
 
-async function parallelSimpleLearn(accounts, options={}) {
+ 
 
-  let newAccountGroups = _.chunk(accounts, 6)
+async function getAllCouses( accounts){
+  let driver = new PuppeteerDriver();
+   
+  let bot = new Bot(driver )
 
-  // 6个进程
-  let promiseArray= []
-  for(let i=0; i<newAccountGroups.length; i++){
-    let accountGroup = newAccountGroups[i]
-    let p = simpleLearn(accountGroup, options)
-    promiseArray.push( p )
+  let students = []
+  for (let i = 0; i < accounts.length; i++) {
+    let account = accounts[i]
+    let { username, password} = account
+    log.debug(  `${i+1} ${username} ${password}` )
+
+    let islogin = await bot.login( username, password )
+
+    let stu = {username, password, islogin, major: '', couses: ''}
+    if( islogin ){
+      let mainPage = bot.mainPage
+      let allCouses = await bot.getAllCouses( mainPage)
+      let majorInfo = await bot.getMajorInfo( )
+  
+      log.debug(allCouses, majorInfo )
+      stu = {username, password, islogin, major: majorInfo.title, couses: allCouses.join(',') }
+    }
+
+    students.push( stu )
+    await bot.logout()
   }
 
-  await Promise.all( promiseArray )
-
+  await driver.quit()
+  return students
 }
 
 async function saveUserJson(username, userInfo) {
@@ -830,6 +873,8 @@ module.exports = {
   handleGenSubject,
   handleGenAccounts,
   handleGenQuiz,
+  handleSubmitPlainQuiz,
   simpleLearn,
-  parallelSimpleLearn
+  getAllCouses,
+  
 }

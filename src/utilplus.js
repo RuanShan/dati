@@ -168,6 +168,10 @@ function buildCouseTitle( couseTitle ){
   return newTitle
 }
 
+function isXingkaoLessonTitle( lessonTitle ){
+  return lessonTitle.includes('形考' ) || lessonTitle.includes('形成性' )
+}
+
 module.exports = {
   getCourseNameByCode,
   scrollToBottom,
@@ -175,5 +179,6 @@ module.exports = {
   playVideo,
   handle503,
   handleDelay,
-  buildCouseTitle
+  buildCouseTitle,
+  isXingkaoLessonTitle
 }
