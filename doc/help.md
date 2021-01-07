@@ -1,6 +1,16 @@
 ## 可以学习的课程
-行政管理： 办公室管理
-计算机科学与技术: 操作系统,计算机专业英语阅读, 计算机导论＃
+行政管理(专科)： 办公室管理,公共行政学,社会调查研究与方法
+
+计算机网络技术（网页设计方向专科）: Java语言程序设计,Dreamweaver网页设计,形势与政策,计算机应用基础
+
+计算机科学与技术: 操作系统,计算机专业英语阅读, 计算机导论＃,数据结构（本）,计算机组成原理
+法律事务: 宪法学,人文英语1
+药学: 人体解剖生理学（本）,病理生理学,社会心理适应 
+护理(专科)：人体解剖学与组织胚胎学
+财务管理(本科)：商务英语4,纳税筹划,市场营销学
+会计(专科)：成本会计,市场营销学
+行政管理(本科):
+小学教育(本科):比较初等教育
 
 ## 生成EXE文件
 pkg .
@@ -28,6 +38,8 @@ node app.js  --account=accountx.csv --type=video lmodules 习近平新时代中�
 
 node app.js  --account=account.json --type=quiz --submitquiz=yes lmodules 3945
 
+node appplus.js  --account=202012/accounts0.csv genxingkao byreview
+node appplus.js  --account=20201229/accounts0.csv --type=xingkao --submitquiz=yes simplelearn
 ### 操作步骤
 1. node app.js  --username=2021101401106 --password=19700221 createlog 国家开放大学学习指南
 2. node app.js --type=video createModuleFile 3945_习近平新时代中国特色社会主义思想
@@ -43,7 +55,12 @@ node app.js  --account=account.json --type=quiz --submitquiz=yes lmodules 3945
 node appplus.js --account=bin/plus/accounts.csv --base=. summary
 # 生成测试题库
 0. node appplus.js  --account=--account=db/20201126a.csv  genquiz
- 
+# 生成形考题库
+node appplus.js  --account=20201229/accounts0.csv --type=xingkao  genxingkao byreview
+# 形考论坛发帖
+node appplus.js  --account=20201229/accounts1.csv --type=xingkaoforum --submitquiz=yes simplelearn
+# 形考论述题
+node appplus.js  --account=20201229/accounts1.csv --type=xingkaofinal --submitquiz=yes simplelearn
 ### TODO
 1. 添加功能，给定格式文件 生成这个课程的内容数据文件
 2. 添加功能，给定格式文件 生成这个课程的所有答案文件

@@ -168,9 +168,160 @@ function buildCouseTitle( couseTitle ){
   return newTitle
 }
 
-function isXingkaoLessonTitle( lessonTitle ){
-  return lessonTitle.includes('形考' ) || lessonTitle.includes('形成性' )
+function isXingkaoLessonTitle( lessonTitle, sectionTitle ){
+  // 比较初等教育 的形考叫 课程考核
+  return lessonTitle.includes('形考' ) || lessonTitle.includes('形成性' ) || sectionTitle.includes('形考' )|| sectionTitle.includes('课程考核' )
 }
+
+function getQuestionClassType( elementClass){
+  let classType = null
+  if( elementClass.includes( 'description') ){
+    classType = 'description'
+  }else if( elementClass.includes( 'truefalse') ){
+    classType = 'truefalse'
+  }else if( elementClass.includes( 'multichoice') ){
+    classType = 'multichoice'      
+  }else if( elementClass.includes( 'multianswer') ){
+    classType = 'multianswer'      
+  }else if( elementClass.includes( 'essay') ){
+    classType = 'essay'      
+  }else if( elementClass.includes( 'shortanswer') ){
+    classType = 'shortanswer'      
+  }
+  return classType
+}
+
+async function buildXingkaoJson(file_path) {
+
+  let quizzes = []
+
+  var data = fs.readFileSync(file_path, 'utf-8');
+
+  let lines = data.split(/(?:\n|\r\n|\r)/g)
+
+  if (lines.length > 0) {
+    let lastLineType = null
+    let questionType = null
+    let question = ''
+    let quizIndex = -1
+
+    let quiz = []
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i]
+      line = line.trim()
+      if (line.length > 0) {
+        if(lastLineType == '题干' ){
+          question = line  // 上一行是 ‘题干’
+          lastLineType = null
+          continue
+        }
+        console.log(i, line )
+
+        if( line.startsWith('题干')){
+          lastLineType = '题干'
+          continue
+        }
+
+
+        if( line.startsWith('形考')){
+          // 形考开始 ， 形考结束
+          quizIndex+=1
+
+          let lessonId = line.replace('形考','')
+          quizzes[quizIndex] = { id: parseInt(lessonId), answers:[]}
+          continue
+        }
+        console.log(i,"正确答案", line.startsWith('正确答案'),line )
+
+        if( line.startsWith('正确答案')){
+          // 正确答案是：国务院
+          
+          answer = line.replace('正确答案是：', '')
+          answer = answer.replace('正确答案：', '')
+          if( questionType == 'truefalse'){
+            answer = answer[0]
+          }
+          quizzes[quizIndex].answers.push( {title: question, answer, classType: questionType})
+          continue
+        }
+        if( line.startsWith('正确的答案是')){
+          answer = line.replace('正确的答案是', '')
+          if( questionType == 'truefalse'){
+            answer = answer[1]
+          }
+          quizzes[quizIndex].answers.push( {title: question, answer, classType: questionType})
+          continue
+        }
+
+        if (['一', '二', '三', '四'].includes(line[0])  && line[1]=='、') {
+          // 一、单项选择题（每小题5分，共50分）
+          if( line.includes('单项选择题')){
+            questionType = 'multichoice'
+          }
+          if( line.includes('判断题')){
+            questionType = 'truefalse'
+          }
+          
+        }  
+      }
+    }
+  }
+  console.log('answerList------------:',quizzes);
+  return quizzes
+}
+
+// 处理copybyreview生成的形考题库文件，生成json
+async function buildXingkaoJsonPlus(file_path) {
+
+  let quizzes = []
+
+  var data = fs.readFileSync(file_path, 'utf-8');
+
+  let lines = data.split(/(?:\n|\r\n|\r)/g)
+
+  if (lines.length > 0) {
+
+    let questionType = null
+    let question = ''
+    let quizIndex = -1
+
+    let quiz = []
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i]
+      line = line.trim()
+      if (line.length > 0) {
+
+        console.log(i, line )
+        // [问题shortanswer] 自秦汉到晚清，中国中央集权的       政治延续2000多年。 
+        if( line.startsWith('[形考')){
+          quizIndex +=1
+          lessionId = line.match( /\d+/)[0]
+          quizzes[quizIndex] = {id: lessionId, answers: []}
+        }
+
+        if( line.startsWith('[问题')){
+          let tagEndindex = line.indexOf(']')
+          question = line.slice( tagEndindex +2 )
+          questionType = line.match( /\w+/)[0]
+          continue
+        }
+
+ 
+        if( line.startsWith('[答案]')){
+          // [答案] 政治文明
+          answer = line.replace('[答案] ', '')     
+          let ismulti = answer.includes(',')
+          quizzes[quizIndex].answers.push( {title: question, answer, classType: questionType, ismulti})
+          continue
+        }       
+         
+      }
+    }
+  }
+  console.log('answerList------------:',quizzes);
+  return quizzes
+}
+
 
 module.exports = {
   getCourseNameByCode,
@@ -180,5 +331,8 @@ module.exports = {
   handle503,
   handleDelay,
   buildCouseTitle,
-  isXingkaoLessonTitle
+  isXingkaoLessonTitle,
+  getQuestionClassType,
+  buildXingkaoJson,
+  buildXingkaoJsonPlus
 }

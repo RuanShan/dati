@@ -27,6 +27,7 @@ const {
   handleGenAccounts,
   handleGenQuiz,
   handleSubmitPlainQuiz,
+  handleGenQuizByTxt,
   simpleLearn,
   getAllCouses
 } = require('./src/indexplus')
@@ -42,7 +43,6 @@ program
   .option('-b, --base <basepath>', 'base path')
   .option('-m, --modulefile <modulefile>', 'module file')
   .option('-s, --submitquiz <yes|no>', 'submit quiz  yes or no')
-  .option('-f, --submitfinal <yes|no>', 'submit final  yes or no')
   .option('-t, --type <type>', 'module type') // 学习的类型
 
 program.command('createlog <course>')
@@ -63,9 +63,8 @@ program.command('simplelearn')
     }
     let type = ( program.type || null)
     let submitquiz = ( program.submitquiz || null)
-    let submitfinal = ( program.submitfinal || null)
     
-    let options = { type, submitquiz, submitfinal }
+    let options = { type, submitquiz }
     let accounts = await getAccounts()  
        
     await simpleLearn(accounts, options)
@@ -213,7 +212,7 @@ program.command('lfinal')
     }
 
     let options = {
-      submitfinal: program.submitfinal,
+      submitquiz: program.submitquiz,
     }
     await  handleLearnFinal(accounts, courseTitle, options )
 
@@ -267,25 +266,41 @@ program.command( 'genquiz')
 
 })
 
-program.command( 'genxingkao')  
+
+program.command( 'genxingkao [byreview]')  
 .description('生成形考测验数据文件')
-.action(async function(  ) {
+.action(async function( byreview ) {
    
   let accounts = await getAccounts( )
  
   filter = 'xingkao'
-
-  await handleGenQuiz(accounts, { filter })
+  
+  await handleGenQuiz(accounts, { filter, byreview })
 
 })
 
-program.command( 'submitquiz')  
-.description('提交空白测试')
-.action(async function(  ) {
+// 读取固定格式形考题库文本文件，生成 xingkao.json
+program.command( 'genxingkaobytxt [file]')  
+.description('读取固定格式形考题库文本文件，生成 xingkao.json')
+.action(async function( file  ) {
    
   let accounts = await getAccounts( )
  
-  await handleSubmitPlainQuiz(accounts,  )
+  filter = 'xingkao'
+  
+  await handleGenQuizByTxt( file)
+
+})
+
+// 提交空白测试
+program.command( 'submitquiz [maxReview]')  
+.description('提交空白测试')
+.action(async function( maxReview ) {
+  let type = ( program.type || null)
+  maxReview = maxReview || 0
+  let accounts = await getAccounts( )
+ 
+  await handleSubmitPlainQuiz(accounts, type, maxReview )
 
 })
 
@@ -475,7 +490,7 @@ console.log( `accounts = ${accounts.length}`)
 }
 // 软件是否可用
 function isAvaible() {
-  let availabe = new Date('2020-12-30')
+  let availabe = new Date('2021-12-30')
   let now = new Date()
 
   if (now < availabe) {

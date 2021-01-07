@@ -496,7 +496,7 @@ class Bot {
     await saveButton.click()
 
     // 点击提交按钮
-    if( options.submitfinal == 'yes'){
+    if( options.submitquiz == 'yes'){
       let submitButtonCss = '.submissionaction:last-child form button.btn-secondary'
       await driver.wait(until.elementLocated(By.css(submitButtonCss)), 15000);
       console.debug("查找提交按钮")

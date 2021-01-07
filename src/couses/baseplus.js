@@ -1,7 +1,8 @@
-const fs = require('fs');
+const { parse } = require('node-html-parser');
+
 const { log } = require('../logger');
 
-const { handle503, handleDelay, isXingkaoLessonTitle} = require ('../utilplus');
+const { handle503, handleDelay, isXingkaoLessonTitle, getQuestionClassType} = require ('../utilplus');
 
 let recursiveCount = 0
 
@@ -51,17 +52,17 @@ async function parseCouseBase(page) {
   }
   for (let i = 0; i < levelOne.length; i++) {
     let a = levelOne[i]
-    let text = await a.$eval('div',node=>node.innerText)
+    let sectionTitle = await a.$eval('div',node=>node.innerText)
     let idHandle = await a.getProperty('id')
     let sectionId = await idHandle.jsonValue()
-    // log.debug(`levelOne.text ${i} ${sectionId} ${text}`)
+    // log.debug(`levelOne.text ${i} ${sectionId} ${sectionTitle}`)
     let levelTwo = await a.$$(sectionl2Css)
     if (levelTwo.length == 0) {
-      // log.debug(`levelOne.text ${i} ${sectionId} ${text} 没有内容。`)
+      // log.debug(`levelOne.text ${i} ${sectionId} ${sectionTitle} 没有内容。`)
       continue
     }
     // 电大资源区，自建资源区
-    if( /课程文件|资源更新区|电大资源区|资源自建区|资源区/.test( text )){
+    if( /课程文件|资源更新区|电大资源区|资源自建区|资源区/.test( sectionTitle )){
       continue
     }
     // 课程文件, 资源更新区, 电大资源区
@@ -106,26 +107,26 @@ async function parseCouseBase(page) {
         }
       }
 
-      if (imgs.length >= 2) {
+      let link = await b.$( sectionl2LinkCss )
+      if (link) {
         // 由于前面的内容没有学习，可能没有链接元素，后面没有圆圈图片
-        let altHandle =  await imgs[1].getProperty('alt')
-        alt = await altHandle.jsonValue()
         //let link = await b.$eval( sectionl2LinkCss, node=> node.href )
         href = await b.$eval( sectionl2LinkCss, node=> node.href )
       }
       let course = {
         classId: classId, // 用于script调用，如完成视频
+        sectionTitle: sectionTitle, // section 标题，用来确定是否为形考
         sectionId: sectionId.substring(8), // section-xxx
         type: type,
         title: text,
-        isFinish: alt.substring(0, 3),
+        isFinish: '未完成',
         url: href,
         id: id.substring(7) // module-xxx
       }
       status.push(course)
-      if (alt.startsWith("未完成")) {
-        // log.debug(`levelTwo.text ${j} ${id} ${type} ${text} ${href} ${alt}`)
-      }
+      // if (alt.startsWith("未完成")) {
+      //   // log.debug(`levelTwo.text ${j} ${id} ${type} ${text} ${href} ${alt}`)
+      // }
     }
   }
   let couseJson = {
@@ -172,17 +173,17 @@ async function parseCouseBase2( page ){
       // 可能不存在标题
       continue
     }
-    let text = await a.$eval('.sectionname,.section-title',node=>node.innerText)
+    let sectionTitle = await a.$eval('.sectionname,.section-title',node=>node.innerText)
     let idHandle = await a.getProperty('id')
     let sectionId = await idHandle.jsonValue()
-    log.debug(`levelOne.text ${i} ${sectionId} ${text}`)
+    log.debug(`levelOne.text ${i} ${sectionId} ${sectionTitle}`)
     let levelTwo = await a.$$(sectionl2Css)
     if (levelTwo.length == 0) {
-      log.debug(`levelOne.text ${i} ${sectionId} ${text} 没有内容。`)
+      log.debug(`levelOne.text ${i} ${sectionId} ${sectionTitle} 没有内容。`)
       continue
     }
     // 电大资源区，自建资源区
-    if( /课程文件|资源更新区|电大资源区|资源自建区|资源区/.test( text )){
+    if( /课程文件|资源更新区|电大资源区|资源自建区|资源区/.test( sectionTitle )){
       continue
     }
     // 课程文件, 资源更新区, 电大资源区
@@ -238,6 +239,7 @@ async function parseCouseBase2( page ){
       let course = {
         classId: classId, // 用于script调用，如完成视频
         sectionId: sectionId.substring(8), // section-xxx
+        sectionTitle: sectionTitle, // section 标题，用来确定是否为形考
         type: type,
         title: text,
         isFinish: alt.substring(0, 3),
@@ -279,12 +281,12 @@ async function copyQuizBase(driver, baseurl, couseLessons, filter ) {
   for (let i = 0; i < couseLessons.length; i++) {
     let lesson = couseLessons[i];
 
-    let {type,id, title} = lesson
+    let {type,id, title, sectionTitle} = lesson
 
     if( type == 'quiz'){
       log.debug( "quiz title=",  title, "filter", filter)
         // 访问url，读取所有试题，可能包含多页
-      if( filter=='xingkao' && !(isXingkaoLessonTitle(title))){        
+      if( filter=='xingkao' && !(isXingkaoLessonTitle(title, sectionTitle))){        
         continue
       }
       let url = `${baseurl}?id=${id}`
@@ -315,9 +317,9 @@ async function copyQuizBase(driver, baseurl, couseLessons, filter ) {
           continue
         }
          
-        quizArray.push( quiz ) 
+        quizArray.push( { id, quiz } ) 
        
-        handleDelay( 1000)
+        handleDelay( 1500)
 
     }
   }
@@ -350,7 +352,8 @@ async function copyOneQuiz( page,  isFirstPage, url ){
     // log.debug('==============isFirstPage==============');
      
     // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
- 
+    // await handle503(page, url);
+
     await page.waitForSelector(startButtonSelector);
     let button = await  page.$(startButtonSelector)
 
@@ -400,15 +403,8 @@ async function copyOneQuiz( page,  isFirstPage, url ){
     //let classString = await (await questionEle.getProperty('class')).jsonValue();
     const classString = await page.evaluate(el => el.getAttribute("class"), questionEle);
 
-    if( classString.includes( 'description') ){
-      classType = 'description'
-    }else if( classString.includes( 'truefalse') ){
-      classType = 'truefalse'
-    }else if( classString.includes( 'multichoice') ){
-      classType = 'multichoice'      
-    }else if( classString.includes( 'multianswer') ){
-      classType = 'multianswer'      
-    }
+    classType = getQuestionClassType(classString )     
+
 
     log.debug( "classType=", i, classType)
     //let answerInputs = await questionEle.$$('.answer input')
@@ -494,26 +490,39 @@ async function copyOneQuiz( page,  isFirstPage, url ){
  * @return {[]} quiz [{ title: '问题', type: 'header,tof,select问题类型', options: ['选项数组']} ]
  * 
  */
-async function copyQuizBaseByReview(driver, baseurl, couseLessons ) {
+async function copyQuizBaseByReview(driver, baseurl, couseLessons, filter ) {
   
 
   let quizArray = []
   for (let i = 0; i < couseLessons.length; i++) {
     let lesson = couseLessons[i];
 
-    let {type,id} = lesson
+    let {type, title, id, sectionTitle} = lesson
     if( type == 'quiz'){
         // 访问url，读取所有试题，可能包含多页
-
+      if( filter=='xingkao' && !(isXingkaoLessonTitle(title, sectionTitle))){        
+          continue
+      }
       let url = `${baseurl}?id=${id}`
       let newPage = await driver.get( url )
       let is503 = false
 
-        let quiz = await copyOneQuizByReview(newPage,  true, url, couseLessons, 0,).catch( async (error)=>{
-          let title = await newPage.title()
-          // log.debug( "catch title=", title)
-          is503 = true
-        })
+      let buttons = await newPage.$$("table.quizattemptsummary td:last-child a")
+
+      let quiz = []
+      log.debug( "review buttons ", buttons.length )
+      for( let j=0; j<buttons.length; j++){
+        newPage = await driver.get( url )
+        let aquiz = await copyOneQuizByReview(newPage,  true, j)
+        quiz = quiz.concat( aquiz )
+        log.debug( "完成形考 回顾", j )
+
+      }
+        // .catch( async (error)=>{
+        //   let title = await newPage.title()
+        //   // log.debug( "catch title=", title)
+        //   is503 = true
+        // })
         
         //newPage.removeListener( 'response', responseListener)
       
@@ -522,9 +531,11 @@ async function copyQuizBaseByReview(driver, baseurl, couseLessons ) {
           i = i-1;
           continue
         }
+        log.debug( "完成形考", i )
          
-        quizArray.push( quiz ) 
+        quizArray.push( { id, quiz } ) 
        
+        handleDelay( 1500)
 
     }
   }
@@ -542,15 +553,15 @@ async function copyQuizBaseByReview(driver, baseurl, couseLessons ) {
  * @param {*} isFirstPage 
  * @return {[]} questions { title: '问题', type: 'header,tof,select问题类型', options: ['选项数组']} 
  */
-async function copyOneQuizByReview( page,  isFirstPage, url ){
+async function copyOneQuizByReview( page,  isFirstPage, reviewIndex=0 ){
   // 读取课程分析文件
   // 选出所有的测试项目
-  let reviewButtonSelector="table.quizattemptsummary .lastcol a"
+  let reviewButtonSelector="table.quizattemptsummary td:last-child  a"
   let startButtonSelector="div.quizstartbuttondiv button[type=submit]"
   //let queXpath = "//div[@class='que truefalse deferredfeedback notyetanswered']"
   let queSelector = ".que"
-  let nextPageSelector = "input[value=下一页]"
-  let prevPageSelector = "input[value=上一页]"
+  let nextPageSelector = ".submitbtns a[title=下一页]"
+  let prevPageSelector = "a.mod_quiz-prev-nav"
   let submitPageSelector = "input[value=结束答题…]"
   
 
@@ -560,10 +571,21 @@ async function copyOneQuizByReview( page,  isFirstPage, url ){
     // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
  
     await page.waitForSelector(reviewButtonSelector);
-    let button = await  page.$(reviewButtonSelector)
-
+    let buttons = await page.$$(reviewButtonSelector)
+    let button = buttons[reviewIndex]
     await Promise.all( [page.waitForNavigation(), button.click()]) // 进入测试页面
+
+    // 所有题目显示在一页
+    let currentUrl = await page.url();
+    
+    currentUrl = currentUrl.replace( /&page=[0-9]/, '')
+
+    await page.goto( currentUrl + '&showall=1')
+    await handleDelay( 500) 
+   
+     
   }
+  await handleDelay( 1000) 
 
   await page.waitForSelector( queSelector );
 
@@ -573,7 +595,7 @@ async function copyOneQuizByReview( page,  isFirstPage, url ){
   const submitPage = await page.$(submitPageSelector)
 
   let questions = await page.$$(queSelector)
-  // log.debug( `questions:${questions.length}`)
+  log.debug( `questions:${questions.length}`)
 
   let keyWords1 = ['一', '二', '三', '四'];
 
@@ -585,24 +607,27 @@ async function copyOneQuizByReview( page,  isFirstPage, url ){
     let copyQuestion = { title: '问题', type: '问题类型', options: ['选项数组'], answer: '', classType }
 
     let questionEle = questions[i];
-    let question = await questionEle.$eval( '.qtext', node=> node.innerText)
-    
-    const classString = await page.evaluate(el => el.getAttribute("class"), questionEle);
+ 
+    let question = '' 
+    let answerWrap = null
+    let classString = await page.evaluate(el => el.getAttribute("class"), questionEle);
 
-    if( classString.includes( 'description') ){
-      classType = 'description'
-    }else if( classString.includes( 'truefalse') ){
-      classType = 'truefalse'
-    }else if( classString.includes( 'multichoice') ){
-      classType = 'multichoice'      
-    }else if( classString.includes( 'multianswer') ){
-      classType = 'multianswer'      
+    classType = getQuestionClassType(classString )     
+
+    if(classType == 'multianswer' ){
+      question =   await questionEle.$eval( '.formulation', node=> node.outerHTML)
+      let parsed = parse(question)
+      let spans = parsed.querySelectorAll( "span" )
+      spans.forEach((ele)=>ele.remove())
+      question = parsed.text
+      answerWrap = await questionEle.$('.formulation')
+    }else{
+      question = await questionEle.$eval( '.qtext', node=> node.innerText)
+      answerWrap = await questionEle.$('.answer')
     }
 
-    let answerWraps = await questionEle.$$('.answer')
-    // log.debug('question---:',question  );
     
-    if (keyWords1.indexOf(question[0]) != -1 && question[1] =='、') {
+    if(classType == 'description'){
       questionNum = 0; // 每一道题的下标
 
       copyQuestion = { title: question, type: 'h1', classType  }
@@ -610,35 +635,143 @@ async function copyOneQuizByReview( page,  isFirstPage, url ){
       continue;
     }
 
-    //// log.debug('key---:',key);
-    for( let j = 0; j< answerWraps.length; j++){
-      let answer = answerWraps[j];
+    if( answerWrap ){
+      let answer = answerWrap;
 
       //let as =  await answer.$$eval('input', node=> node.value)
       let labels  = await answer.$$eval('label', nodes=> nodes.map( n=>n.innerText))
       // 正确的答案是“错”。
       // 正确答案是：质量互变规律
-      let correct = await questionEle.$eval('.feedback .rightanswer', node=> node.innerText)
+      // The correct answers are:  多选题
 
-      if(labels.length==2){//判断题
-        
+      if(classType == 'truefalse'){//判断题
+        // 有的科目只显示是否正确，不显示正确答案，如：Java语言程序设计
+        let rightanswer = await questionEle.$('.feedback .rightanswer')
+        let correct = null
+        if( rightanswer ){
+          correct = await questionEle.$eval('.feedback .rightanswer', node=> node.innerText)
           // log.debug('chose ',labels);
           //正确的答案是“错”。
           correct = correct.substr( 7,1)
+        }else{
+          // 在选项中查找标记为正确的答案
+          let correctEle = await answer.$('.correct>label')
+          let incorrectEle = await answer.$('.incorrect>label')
+          if( correctEle){
+            correct = await answer.$eval('.correct>label', node=> node.innerText)
+          }else if(incorrectEle ){
+            let selected = await answer.$eval('.incorrect>label',  node=> node.innerText)
+            correct = selected == '对' ? '错' : '对'
+          }
+        }
+
           copyQuestion = { title: question, type: 'tof', options: labels, answer: correct, classType  }
-      }else{//选择题
+      }else if(classType == 'multichoice'){//选择题
+
+        let rightanswer = await questionEle.$('.feedback .rightanswer')
+        let correct = null
+        if( rightanswer ){
+          correct = await questionEle.$eval('.feedback .rightanswer', node=> node.innerText)
+        }else{
+          // 可能为多选
+          let correctDivs = await answer.$$('.correct>label')
+           
+          if( correctDivs.length>0){
+            let corrects = await answer.$$eval('.correct>label', nodes=> nodes.map( n=>n.innerText))
+            // 去掉 A. ,B., C. D. E.  选择题位置可能变化
+            let fixedCorrects = corrects.map( b => b.replace(/\s*/g,"").replace(".","").substring(1)  )
+            //log.debug( "corrects=", correctDivs.length, corrects, "question",question )
+            correct = fixedCorrects.join(',')
+          }
+        }
+        let prompt = await questionEle.$eval('.prompt', node=> node.innerText)
         // a. 国家开放大学是基于信息技术的特殊的大学
         // let fixedLabels = labels.map( b => b.replace(/\s*/g,"").replace(".","").substring(1)  )
         // 有的选项中有换行符，去掉
         let fixedLabels = labels.map( b => b.replace(/[\n\r]+/g,"") )
         // 正确答案是：质量互变规律
-        correct = correct.substr( 6 )
+        // The correct answers are: 君主制, 贵族共和制, 民主共和制
+        // log.debug( "correct=",i, correct, question)
+        let ismulti = prompt.includes( '选择一项或多项')
+        if( correct ){
+          if( ismulti){
+            correct = correct.replace(  "The correct answers are: ", '')
+          }else{
+            correct = correct.replace( "正确答案是：", '' )
+          }
+        }
 
-        copyQuestion = { title: question, type: 'select', options: fixedLabels, answer: correct, classType  }
+
+        copyQuestion = { title: question, type: 'select', options: fixedLabels,  answer: correct, classType, ismulti  }
 
         // log.debug('chose ', fixedLabels);
+      }else if(classType == 'multianswer'){
 
+        let answers = []
+        let subquestions = await questionEle.$$('.subquestion')
+        for( let k=0; k<subquestions.length; k++){
+          let sub = subquestions[k]
+          // 可能是 input、或 select
+          let inputvalue = ''
+          let selectEle = await sub.$('select')
+          let inputEle = await sub.$('input')
+          let iscorrect = await sub.$('i.fa-check')
+          if( inputEle){
+            inputvalue = await sub.$eval('input', node=> node.value)
+            
+          }else if( selectEle ){
+            inputvalue = await sub.$eval('select [selected]', node=> node.innerText)             
+          }
+
+          log.debug( classType, inputvalue)
+          if( !iscorrect){
+            // 不正确<br>正确答案是：主席负责制<br>获得2.00分中的0.00分 
+            inputvalue = await sub.$eval('.feedbackspan ', node=> node.innerHTML)
+            let splited = inputvalue.split( '<br>')
+            if( splited.length == 3){
+              inputvalue = splited[1].replace( "正确答案是：", '')
+            }
+          }
+          answers.push( inputvalue)
+        }
+        copyQuestion = { title: question, type: classType,  answer: answers, classType  }
+
+      }else if(classType == 'essay'){
+        //let correct = await questionEle.$eval('.feedback', node=> node.innerText)
+        let correctFileEle = await questionEle.$('.qtype_essay_response')
+        let correctEditorEle = await questionEle.$('.qtype_essay_editor')
+        let feedbackEle = await questionEle.$('.feedback')
+
+        let correct = ''
+        if( correctFileEle ){
+          correct = await questionEle.$eval('.qtype_essay_response', node=> node.innerText)
+        }else if( correctEditorEle ){
+          correct = await questionEle.$eval('.qtype_essay_editor', node=> node.innerText)
+        }
+        if( correct.length == 0 && feedbackEle){
+          correct = await questionEle.$eval('.feedback', node=> node.innerText)
+        }
+        // log.debug(classType, question, correct)
+        copyQuestion = { title: question, type: classType,  answer: correct, classType  }
+
+      }else if(classType == 'shortanswer'){
+        // 简单题，通常一行文本填空
+        let rightanswer = await questionEle.$('.feedback .rightanswer')
+
+        let correct = null
+        if( rightanswer ){
+          correct = await questionEle.$eval('.feedback .rightanswer', node=> node.innerText)
+          // log.debug('chose ',labels);
+          //正确的答案是“错”。
+          correct = correct.replace( "正确答案是：", '' )
+        }
+        // log.debug(classType, question, correct)
+        copyQuestion = { title: question, type: classType,  answer: correct, classType  }
       }
+      else{
+        log.error( '无法处理的题型', classType, question)
+      }
+
     }
     copys.push( copyQuestion)
 
@@ -648,13 +781,13 @@ async function copyOneQuizByReview( page,  isFirstPage, url ){
  
 
   if(nextPage){
-    // log.debug('=======has nextPage=======');
+    log.debug('=======has nextPage=======');
     await Promise.all( [page.waitForNavigation(), nextPage.click()])
 
     let otherCopys =  await copyOneQuizByReview( page, false )
     copys = copys.concat( otherCopys)
   }else if(submitPage){
-    // log.debug('=======has submitPage=======');
+    log.debug('=======has submitPage=======');
 
   }
   return copys
@@ -665,10 +798,11 @@ async function copyOneQuizByReview( page,  isFirstPage, url ){
  * @param {*} driver 
  * @param {*} url 
  * @param {*} options 
- * @param {*} answsers 
+ * @param {*} quizzes 
+ * @param {*} lessonId - 考试Id
  * @param {*} quiznum - 考试在所有考试中的index
  */
-async function handleQuizBase( driver, url,  options, answsers, quiznum){
+async function handleQuizBase( driver, url,  options, quizzes, lessonId){
   
 
   let startButtonSelector="div.quizstartbuttondiv button[type=submit]"
@@ -676,8 +810,16 @@ async function handleQuizBase( driver, url,  options, answsers, quiznum){
   let page = null
   page = await driver.get( url )
   await handle503(page, url);
-
+  
+  let attemptText = await page.$eval( '.quizattempt', node=> node.outerHTML)
+  if( attemptText.includes('不允许再试')){
+    log.error( '不允许再试' )
+    return
+  }
+  
   await page.waitForSelector(startButtonSelector);
+  await  handleDelay( 500  );
+
   let button = await page.$(startButtonSelector)
 
   let navSuccess = true
@@ -687,14 +829,15 @@ async function handleQuizBase( driver, url,  options, answsers, quiznum){
     log.error( '答题页面打开超时...', e)
     navSuccess = false
       
-  }); 
+  });
+
   if( navSuccess ){
     recursiveCount = 0
-    await processOneQuiz( page,answsers, quiznum, options )
+    await processOneQuiz( page, quizzes, lessonId, true,  0, options )
   }else{
     recursiveCount += 1
     log.warn( '答题页面打开超时 递归调用 handleQuizBase... ', navSuccess, recursiveCount)
-    await handleQuizBase( driver, url,  options, answsers, quiznum)
+    await handleQuizBase( driver, url,  options, quizzes, lessonId)
   }
 }
 
@@ -703,19 +846,32 @@ async function handleQuizBase( driver, url,  options, answsers, quiznum){
  * @param {*} driver 
  * @param {*} url 测试地址
  * @param {*} id 
- * @param {*} quiznum 测试在所有测验中的位置，对应题库的索引
+ * @param {*} questionIndex 当前测验页面中的题在整个单元测试中的序号，用于显示当前题的排序序号
  * @param {*} isFirstPage 
- * @param {*} options - {submitquiz, filter
- * @param {*} answsers 
+ * @param {*} options - {submitquiz, type
+ * @param {*} quizzes
  */ 
-async function processOneQuiz( page, answsers,  quiznum, options){
-  let {submitquiz, filter} = options
+async function processOneQuiz( page, quizzes, lessonId, isFirstPage, questionIndex, options){
+  let {submitquiz, type} = options
   //let queXpath = "//div[@class='que truefalse deferredfeedback notyetanswered']"
   let queSelector = ".que"
   let nextPageSelector = "input[value=下一页]"
   let prevPageSelector = "input[value=上一页]"
   let submitPageSelector = "input[value=结束答题…]"
-  await handle503(page);
+
+  if(isFirstPage){
+    log.debug('==============isFirstPage==============');
+      
+    // 如果不是第一页，进入第一页
+    let currentUrl = await page.url();
+    if( currentUrl.includes('page=')){
+      currentUrl = currentUrl.replace( /&page=[0-9]/, '')
+      await page.goto( currentUrl  )
+    }
+
+    await handleDelay( 500) 
+        
+  }
 
   await page.waitForSelector( queSelector );
 
@@ -726,50 +882,60 @@ async function processOneQuiz( page, answsers,  quiznum, options){
 
   let questions = await page.$$(queSelector)
   //// log.debug( `questions:${questions.length}`)
-
-  let keyWords1 = ['一', '二', '三', '四'];
   
   let questionNum = 0
   for (let i = 0; i < questions.length; i++) {
     let questionEle = questions[i];
-    let question = await questionEle.$eval( '.qtext p', node=> node.innerText)
-    let answerWraps = await questionEle.$('.answer')
-
+    
     const classString = await page.evaluate(el => el.getAttribute("class"), questionEle);
     let classType = 'unkonw'
-
-    if( classString.includes( 'description') ){
-      classType = 'description'
-    }else if( classString.includes( 'truefalse') ){
-      classType = 'truefalse'
-    }else if( classString.includes( 'multichoice') ){
-      classType = 'multichoice'      
-    }else if( classString.includes( 'multianswer') ){
-      classType = 'multianswer'      
-    }
+    let question = '' 
+    let answerWrap = null
+    classType = getQuestionClassType(classString )    
 
     if(classType == 'description'){
       continue;
     }
-    //log.debug(`answsers[${quiznum}][${pagenum}][${questionNum}]:`);
-    let key = null
-    if( filter == 'xingkao'){
-      let list = answsers[quiznum]
-
-      key = list.find( ( a)=> a.title.includes(question))
+    questionIndex = questionIndex+1
+     
+    if(classType == 'multianswer' ){
+      question =   await questionEle.$eval( '.formulation', node=> node.outerHTML)
+      let parsed = parse(question)
+      let spans = parsed.querySelectorAll( "span" )
+      spans.forEach((ele)=>ele.remove())
+      question = parsed.text
+      answerWrap = await questionEle.$('.formulation')
     }else{
-      key = answsers[quiznum][questionNum]
-
+      question = await questionEle.$eval( '.qtext', node=> node.innerText)
+      answerWrap = await questionEle.$('.answer')
     }
-    //log.debug('key---:',key);
+
+    log.debug(`lessonId: ${lessonId}, questionIndex=${questionIndex}` );
+    let key = null
+    if( type == 'xingkao'){
+      // 
+      let list = quizzes.find((a)=>a.id==lessonId)
+      let quiz = list.answers
+      // log.debug(i,quiz.length, "question=", question)
+      // quiz.find( ( a, k)=> { 
+      //   log.debug( k, a.title, question.includes(a.title)); 
+      //   return question.includes(a.title) && a.answer 
+      // });
+      key = quiz.find( ( a)=> question.includes(a.title) && a.answer )
+    }else{
+      let list = quizzes.find((a)=>a.id==lessonId)
+      let quiz = list.answers
+      key = quiz.find( ( a)=> question.includes(a.title) && a.answer)
+    }
+    log.debug('key---:',key);
 
 
     if( key ){
-      let answer = answerWraps;
-      let labels = await answer.$$('label')
-      let labelTexts  = await answer.$$eval('label', nodes=> nodes.map( n=>n.innerText))
+       
+      let labels = await answerWrap.$$('label')
+      let labelTexts  = await answerWrap.$$eval('label', nodes=> nodes.map( n=>n.innerText))
 
-      //log.debug(labelTexts);
+      log.debug(labelTexts);
       if( classType == 'truefalse'){//判断题
         for( let k = 0; k< labelTexts.length; k++){
           let b = labelTexts[k]
@@ -783,33 +949,86 @@ async function processOneQuiz( page, answsers,  quiznum, options){
         }
         
       }else if(classType == 'multichoice'){//选择题
+        let ismulti = key.ismulti
         for( let k = 0; k< labelTexts.length; k++){
           let b = labelTexts[k]
           let label = labels[k]
-          if(b.includes( key.answer )){
-            await label.click()
+          if( ismulti ){
+            let corrects = key.answer.split(',')
+            let found = corrects.find((a)=> b.includes(a))
+            if( found ){
+              await label.click()
+            }
+          }else{
+            if(b.includes( key.answer )){
+              await label.click()
+            }
           }
+
         }
-      }else if(classType == 'multianswer'){//填空题
-        log.error(`填空题 quiznum=${quiznum}   ${i}`,question);
+      }else if(classType == 'shortanswer'){//填空题
+        let input = await answerWrap.$('.formulation input.form-control')
+        await input.focus();
+        await page.keyboard.down('Control');
+        await page.keyboard.press('KeyA');
+        await page.keyboard.up('Control');
+        await page.keyboard.press('Delete');    
+        await input.type( key.answer )
+
+      }else if(classType == 'multianswer'){//填空题 或 选择题
+
+        let inputs = await answerWrap.$$('.subquestion input.form-control')
+        let selects = await answerWrap.$$('.subquestion select')
+        
+        let answers = key.answer
+
+        if( inputs.length == answers.length){
+          for(let i=0;i<inputs.length; i++){
+            let input = inputs[i]
+            let answer = answers[i]           
+            await input.focus();
+            await input.type( answer )
+          }
+        }else if( selects.length == answers.length){
+          for(let i=0;i<selects.length; i++){
+            let select = selects[i]
+            let answer = answers[i]           
+            await select.focus();
+            await select.type( answer )
+          }
+        }else{
+          log.error(`无法处理试题类型 classType=${classType}   ${i}`,question);
+        }
+      }else if(classType == 'essay'){//论述题
+        
+        await page.waitForSelector('iframe')
+        const textBody = await answerWrap.$('iframe')
+        await textBody.focus();
+        await page.keyboard.down('Control');
+        await page.keyboard.press('KeyA');
+        await page.keyboard.up('Control');
+        await page.keyboard.press('Delete');
+        await textBody.type( key.answer )
 
       }else{
-        log.error(`无法处理试题类型 quiznum=${quiznum}   ${i}`,question);
+        log.error(`无法处理试题类型 classType=${classType}   ${i}`,question);
       }
     }else{
-       log.error(`无法找到试题 quiznum=${quiznum}   ${i}`,question);
+       log.error(`无法找到试题 classType=${classType}   ${i}`,question);
     }
-
     
     questionNum++;
   }
 
   if(nextPage){
+    await  handleDelay( 1000  );
     //log.debug('=======has nextPage=======');
     await Promise.all( [page.waitForNavigation(), nextPage.click()])
 
-    return await processOneQuiz( page,answsers,quiznum, options)
+    return await processOneQuiz( page,quizzes,lessonId, false, questionIndex, options)
   }else if(submitPage){
+    await  handleDelay( 1000  );
+
     //log.debug('=======has submitPage=======');
     await Promise.all([  page.waitForNavigation(), submitPage.click()])
     
@@ -832,6 +1051,8 @@ async function processOneQuiz( page, answsers,  quiznum, options){
     const submitButton = await page.$$('.submitbtns button.btn-secondary')
     // log.debug('submitButton-----:',submitButton.length);
     await submitButton[1].click()
+    // 等一下以免503
+    await  handleDelay( 1000  );
 
     await page.waitForSelector( '.confirmation-dialogue input.btn-primary' );
 
@@ -845,62 +1066,25 @@ async function processOneQuiz( page, answsers,  quiznum, options){
 }
  
 
-
-/**
- * 形考答题
- * @param {*} driver 
- * @param {*} url 
- * @param {*} options 
- * @param {*} answsers 
- * @param {*} quiznum - 考试在所有考试中的index
- */
-async function handleXingkaoBase( driver, url,  options, answsers, quiznum){
-  
-
-  let startButtonSelector="div.quizstartbuttondiv button[type=submit]"
-
-  let page = null
-  page = await driver.get( url )
-  await handle503(page, url);
-
-  await page.waitForSelector(startButtonSelector);
-  let button = await page.$(startButtonSelector)
-
-  let navSuccess = true
-  // 进入测试页面
-  await Promise.all( [page.waitForNavigation(), button.click()]).catch(async e=>{
-    // 试试重新加载, 不能使用reload， 这样页面并不是新页面
-    log.error( '答题页面打开超时...', e)
-    navSuccess = false
-      
-  }); 
-  if( navSuccess ){
-    recursiveCount = 0
-    await processOneQuiz( page,answsers, quiznum, options )
-  }else{
-    recursiveCount += 1
-    log.warn( '答题页面打开超时 递归调用 handleQuizBase... ', navSuccess, recursiveCount)
-    await processOneQuiz( driver, url,  options, answsers, quiznum)
-  }
-}
-
 /**
  * 提交空题，以便生成题库
  * @param {*} driver 
  * @param {*} baseurl 
  * @param {*} couseLessons 
  */
-async function submitPlainQuizBase( driver, baseurl, couseLessons){
+async function submitPlainQuizBase( driver, baseurl, couseLessons, filter, maxReview){
   
 
   let quizArray = []
   for (let i = 0; i < couseLessons.length; i++) {
     let lesson = couseLessons[i];
 
-    let {type,id} = lesson
+    let {type, id, title, sectionTitle} = lesson
     if( type == 'quiz'){
         // 访问url，读取所有试题，可能包含多页
-
+      if( filter=='xingkao' && !(isXingkaoLessonTitle(title, sectionTitle))){        
+          continue
+      }
       let url = `${baseurl}?id=${id}`
       let newPage = await driver.get( url )
       let is503 = false
@@ -914,7 +1098,7 @@ async function submitPlainQuizBase( driver, baseurl, couseLessons){
         //   }
         // }
         //newPage.on('response',responseListener )
-        let quiz = await submitOneQuiz(newPage,  true, url, couseLessons, 0,)
+        let quiz = await submitOneQuiz(newPage,  true, maxReview )
         // .catch( async (error)=>{
         //   let title = await newPage.title()
 
@@ -943,7 +1127,7 @@ async function submitPlainQuizBase( driver, baseurl, couseLessons){
  * @param {*} url 测试地址
  * @param {*} isFirstPage 
  */ 
-async function submitOneQuiz( page, isFirstPage ){
+async function submitOneQuiz( page, isFirstPage, maxReview ){
   let submitquiz = 'yes'
   let reviewButtonSelector="table.quizattemptsummary .lastcol a"
   let startButtonSelector="div.quizstartbuttondiv button[type=submit]"
@@ -959,11 +1143,11 @@ async function submitOneQuiz( page, isFirstPage ){
   if(isFirstPage){    
     // 如果标题 '503 Service' 开头, 表示503错误，需要重新载入url
 
-    let reviewButton = await  page.$(reviewButtonSelector)
+    let reviewButtons = await  page.$$(reviewButtonSelector)
     let startButton = await  page.$(startButtonSelector)
 
-    if( reviewButton ){
-      log.warn( "find review button ")  
+    if( reviewButtons.length>=maxReview ){
+      log.warn( "find review button ", reviewButtons.length)  
       return 
     }else{
   
@@ -985,7 +1169,7 @@ async function submitOneQuiz( page, isFirstPage ){
     //log.debug('=======has nextPage=======');
     await Promise.all( [page.waitForNavigation(), nextPage.click()])
 
-    return await submitOneQuiz( page,false)
+    return await submitOneQuiz( page,false, maxReview)
   }else if(submitPage){
     //log.debug('=======has submitPage=======');
     await Promise.all([  page.waitForNavigation(), submitPage.click()])

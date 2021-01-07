@@ -10,6 +10,9 @@ const config = require( '../config')
 const {
   BotPlus,  
 } = require('./botplus.js');
+const {
+  buildXingkaoJsonPlus
+} = require('./utilplus')
 
 const {
   getAccount,  
@@ -118,13 +121,12 @@ async function handleCreateDb(accounts=[] ) {
         let courseTitle = subject
         await bot.prepareForLearn(courseTitle)
         // 如果这门课的数据文件存在
-        let exists =  isCouseJsonExists( username, courseTitle)
-        if( !exists ){
+         
           await bot.profileCouse(courseTitle)
           // .catch(async(e)=>{
           //   log.error( `无法创建课程数据文件 ${courseTitle}`, e)
           // })
-        }
+         
         await bot.logout()
 
     }else{
@@ -401,7 +403,7 @@ async function handleGenQuiz(accounts, options={}){
  * 提交空白题库，以便下一步生成题库文件
  * @param {[]} accounts { username, password, subject }
  */
-async function handleSubmitPlainQuiz(accounts){
+async function handleSubmitPlainQuiz(accounts, filter, max){
   let driver = new PuppeteerDriver();
 
   let bot = new Bot(driver )
@@ -416,7 +418,7 @@ async function handleSubmitPlainQuiz(accounts){
       continue
     }
     await bot.login( username, password )
-    await bot.submitPlainQuiz( subject )
+    await bot.submitPlainQuiz( subject, filter,max )
     await bot.logout()
 
   }
@@ -433,7 +435,7 @@ async function simpleLearn(accounts, options={}) {
 
   log.info( "配置", config)
   let driver = new PuppeteerDriver();
-  let { type, submitquiz, submitfinal } = options
+  let { type, submitquiz } = options
   let bot = new Bot(driver )
   log.info("开始学习课程 人数=", accounts.length)
 
@@ -499,33 +501,54 @@ async function simpleLearn(accounts, options={}) {
 
           
           if( accountInfo == null ){
-            accountInfo = { username, password, subject, islogin: islogin, isexist:isFileExists, code: couseBaseInfo.code, videodone: false, quizdone: false, pagedone: false, finaldone: false }
+            accountInfo = { username, password, subject, islogin: islogin, isexist:isFileExists, code: couseBaseInfo.code, videodone: false, quizdone: false, pagedone: false, xingkaodone: false, finaldone: false, forumdone: false }
           }
           log.info( `课程进度`, accountInfo)
           // 如果当前课程可以学习
 
           // 5.1 学习单元测试，并保存进度
-          if( ( type == null || type=='page') && !accountInfo.pagedone ){
+          if( (   type=='page') && !accountInfo.pagedone ){
             await bot.learnCouse({ type: 'page' })
             accountInfo.pagedone = true
           }
           // 5.2 学习视频，并保存进度
-          if( ( type == null || type=='video') && !accountInfo.videodone ){
+          if( (   type=='video') && !accountInfo.videodone ){
             await bot.learnCouse({ type: 'video' })
             // await bot.watchAllVideoByApi()
             accountInfo.videodone = true
           }
           // 5.3 学习单元测试，并保存进度
-          if( ( type == null || type=='quiz') && !accountInfo.quizdone ){
+          if( (  type=='quiz') && !accountInfo.quizdone ){
             await bot.learnCouse({ type: 'quiz', submitquiz: submitquiz })
             if( submitquiz == 'yes'){
               accountInfo.quizdone = true
             }
           }
+          // 5.4 形式考试
+          if( (  type=='xingkao') && !accountInfo.xingkaodone ){
+            await bot.learnCouse({ type: 'xingkao', submitquiz: submitquiz })
+            if( submitquiz == 'yes'){
+              accountInfo.xingkaodone = true
+            }
+          }
+          // 5.5 论坛发帖
+          if( (  type=='xingkaoforum') && !accountInfo.forumdone ){
+            await bot.learnCouse({ type: 'xingkaoforum', submitquiz: submitquiz })
+            if( submitquiz == 'yes'){
+              accountInfo.forumdone = true
+            }
+          }
+          // 5.6 形考论述
+          if( (  type=='xingkaofinal') && !accountInfo.finaldone ){
+            await bot.learnCouse({ type: 'xingkaofinal', submitquiz: submitquiz })
+            if( submitquiz == 'yes'){
+              accountInfo.finaldone = true
+            }
+          }
           // 7. 学习终结性考试，并保存进度
 
-          if( ( type == null || type=='final') && !accountInfo.finaldone ){
-            await bot.learnFinal( { submitfinal:submitfinal } )       
+          if( (  type=='final') && !accountInfo.finaldone ){
+            await bot.learnFinal( { submitquiz:submitquiz } )       
             accountInfo.finaldone = true
           }
           // 8. 保存账号数据
@@ -856,6 +879,16 @@ function addCouseIntoDb(code, title){
 }
 
 
+//读取固定格式形考题库文本文件，生成 xingkao.json
+async function handleGenQuizByTxt(  file){
+  let basename = path.basename(file, '.txt')
+  let json = await buildXingkaoJsonPlus( file )
+  let jsonfile = `./${basename}xingkao.json`
+
+  fs.writeFileSync(jsonfile, JSON.stringify( { answers: json } ))
+
+}
+
 
 module.exports = {
   handleAccountsCheckin,
@@ -874,6 +907,7 @@ module.exports = {
   handleGenAccounts,
   handleGenQuiz,
   handleSubmitPlainQuiz,
+  handleGenQuizByTxt,
   simpleLearn,
   getAllCouses,
   

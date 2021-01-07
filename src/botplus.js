@@ -163,7 +163,7 @@ class BotPlus {
     
     let typeFilter = options.type
 
-    log.debug( `课程学习中 ${this.couseTitle}`, '参数', options )
+    // log.debug( `课程学习中 ${this.couseTitle}`, '参数', options )
     
    
     let moduleStatus = this.couseInfo.status
@@ -171,21 +171,22 @@ class BotPlus {
 
     for (let i = 0; i < moduleStatus.length; i++) {
       let lesson = moduleStatus[i];
-      let { isFinish, url, type, title } = lesson;
+      let { isFinish, url, type, title, sectionTitle } = lesson;
        
        
- 
+      log.debug( `课程学习中 typeFilter${typeFilter}`, !isXingkaoLessonTitle( title, sectionTitle )  )
 
-      if( typeFilter == 'xingkao' && !isXingkaoLessonTitle( title ) ){
-        continue
-
+      if( typeFilter.startsWith( 'xingkao') ){
+        if(  !isXingkaoLessonTitle( title, sectionTitle ) ){
+          continue
+        }
       }else  if (  typeFilter != type) {
         continue
       }
       
       try{
        
-        let title = lesson.title
+        
         log.debug(`学习小节${title} url=${url}`)
         let done = false
         if (type == 'video') {
@@ -194,8 +195,8 @@ class BotPlus {
           if (success) {
             isFinish = '完成'
           }
-        } else if (type=='page') {
-
+        } else if (type=='page' && typeFilter != 'xingkao') {
+          // 形考不处理页面
           if(url.includes('/mod/page/view')){
             await this.readText(lesson)
             isFinish = '完成'
@@ -204,15 +205,31 @@ class BotPlus {
         } else if (type == 'quiz') {
           // 只有类型为答题时，再答题，以免多次答题
           if (typeFilter == 'xingkao') {
-            if( isXingkaoLessonTitle( title )){
-              await this.goXingkao(lesson, lesson.position, options)
+            if( isXingkaoLessonTitle( title, sectionTitle )){
+              await this.goXingkao(lesson,  options)
             }
-          }else
+          }else if(typeFilter == 'quiz' )
           {            
-            await this.goQuiz(lesson, lesson.position, options)
+            await this.goQuiz(lesson, options)
             isFinish = '完成'
           }
-        } else {
+        } else if (type == 'assign' || type == 'boost_assign') {
+          // 课程 parseCouseBase2 分析的结构 type = boost_assign， 如：幼儿园课程论
+          // 形式考试，提交文件
+          if (typeFilter == 'xingkaofinal') {
+            if( isXingkaoLessonTitle( title, sectionTitle )){
+              await this.goFinal(lesson,  options)
+            }
+          }
+        } else if (type == 'forum') {
+          // 形式考试，提交文件
+          if (typeFilter == 'xingkaoforum') {
+            if( isXingkaoLessonTitle( title, sectionTitle )){
+              await this.goForum(lesson,  options)
+            }
+          }
+          
+        }else {
           log.error(`无法识别的课程url =${url}`)
         }
         // 每学完一课，更新一下数据文件
@@ -261,7 +278,7 @@ class BotPlus {
           await this.readText(lesson)
         } else if (type == 'quiz') {
 
-          await this.goQuiz(lesson, lesson.position, options)
+          await this.goQuiz(lesson,  options)
         } else {
           log.error(`无法识别的课程url =${url}`)
         }
@@ -325,11 +342,11 @@ class BotPlus {
 
   }
 
-  async goQuiz(lesson, num, options) {
+  async goQuiz(lesson,  options) {
     let driver = this.driver
 
     let isFinish = lesson.isFinish;
-    let id = lesson.id
+    let lessonId = lesson.id
 
 
       //let url = lesson.url
@@ -339,7 +356,7 @@ class BotPlus {
         code,
         host
       } = CouseUrlMap[this.couseTitle]
-      let url = `http://${host}/mod/quiz/view.php?id=${id}`
+      let url = `http://${host}/mod/quiz/view.php?id=${lessonId}`
 
       let fullname = `${title}_${code}`
       let answerfile = `./db/answers/${fullname}.json`
@@ -347,60 +364,50 @@ class BotPlus {
       let answsers = json.answers
       // 加载题库文件
 
-      log.log('this.couseTitle---:', this.couseTitle);
-      if (title == '习近平新时代中国特色社会主义思想') {
-        await handleQuizBase(driver, url, options, answsers, num )
-      } else if (title == '国家开放大学学习指南') {
-        await handleQuizBase(driver, url, options, answsers, num )
-      } else if (title == '思想道德修养与法律基础') {
-        await handleQuizBase(driver, url, options, answsers, num )
-      } else if (title == '毛泽东思想和中国特色社会主义理论体系概论') {
-        await handleQuizBase(driver, url, options, answsers, num )
-      } else if (title == '马克思主义基本原理概论') {
-        await handleQuizBase(driver, url, options, answsers, num )
-      } else if (title == '中国近现代史纲要') {
-        await handleQuizBase(driver, url, options, answsers, num )
-      } else  {  
-        await handleQuizBase(driver, url, options, answsers, num )
-      }
-      log.log('this quiz is done');
-  }
-
-  async goXingkao( ) {
-    let driver = this.driver
-
-    let isFinish = lesson.isFinish;
-    let id = lesson.id
-
-
-      //let url = lesson.url
-      let lessonTitle = lesson.title
-      let {
-        title,
-        code,
-        host
-      } = CouseUrlMap[this.couseTitle]
-      let url = `http://${host}/mod/quiz/view.php?id=${id}`
-
-      let fullname = `${title}_${code}`
-      let answerfile = `./db/answers/${fullname}.json`
-      let json = JSON.parse(fs.readFileSync(answerfile,'utf8'));
-      let answsers = json.answers
-      // 加载题库文件
-
-      log.log('this.couseTitle---:', this.couseTitle);
- 
-        await handleQuizBase(driver, url, options, answsers, num )
+      log.log('this.couseTitle---:', this.couseTitle, lessonTitle);
+      
+      await handleQuizBase(driver, url, options, answsers, lessonId )
       
       log.log('this quiz is done');
   }
 
-  async goFinal(lesson, options) {
-    log.debug('=================goFinal=================', options);
+  async goXingkao(lesson,  options ) {
     let driver = this.driver
 
     let isFinish = lesson.isFinish;
-    let id = lesson.id
+    let lessonId = lesson.id
+
+
+      //let url = lesson.url
+      let lessonTitle = lesson.title
+      let {
+        title,
+        code,
+        host
+      } = CouseUrlMap[this.couseTitle]
+      let url = `http://${host}/mod/quiz/view.php?id=${lessonId}`
+
+      let fullname = `${title}_${code}`
+      let answerfile = `./db/answers/${fullname}xingkao.json`
+      let json = JSON.parse(fs.readFileSync(answerfile,'utf8'));
+      let answsers = json.answers
+      // 加载题库文件
+
+      log.log('this.couseTitle :', this.couseTitle);
+ 
+      await handleQuizBase(driver, url, options, answsers, lessonId )
+      
+      log.log('this quiz is done');
+  }
+
+  // 处理提交文本的测试，一般为终结性考试
+  async goFinal(lesson, options) {
+    log.debug('=================goFinal=================', options);
+    let { type } = options
+    let driver = this.driver
+
+    let lessonType = lesson.type;
+    let lessonId = lesson.id
     let url = lesson.url
     let classId = lesson.classId
 
@@ -412,43 +419,106 @@ class BotPlus {
       log.info("作业已经提交")
       return
     }
-
+    let status = await page.$eval( '.submissionsummarytable tr:first-child td.lastcol', node=>node.innerText.trim() )
+    log.info("final lesson status", status)
+    if( status == '这个作业不需要您在网上提交任何东西'){
+      log.info(status)
+      return
+    }
     await page.waitForSelector( '.singlebutton button.btn-secondary');
     const commitButton = await page.$( '.singlebutton button.btn-secondary')
     // 等待commit的click功能
     await commitButton.click()
-    await handleDelay(300);
-    log.debug("编辑按钮")
+    await handleDelay(1500);
+    await page.waitForSelector( '.editsubmissionform .row .col-form-label');
 
-    // 可能会超时，需要重新加载
-    await page.waitForSelector('iframe', {timeout:45000}).catch(async(e)=>{
-      log.error( " TimeoutError: waiting for selector iframe", e)
-      await page.reload()
-    }); 
+    // 检查提交文本还是文件
+    let label = await page.$eval( '.editsubmissionform .row .col-form-label', node=>node.innerText.trim() )
+    log.debug("编辑按钮", label)
+    if( label == '在线文本'){
+      
+      // 可能会超时，需要重新加载
+      await page.waitForSelector('iframe', {timeout:45000}).catch(async(e)=>{
+        log.error( " TimeoutError: waiting for selector iframe", e)
+        await page.reload()
+      }); 
 
-    // 多等一会  failed: timeout 30000ms exceeded
-    const textBody = await page.$('iframe')
+      // 多等一会  failed: timeout 30000ms exceeded
+      const textBody = await page.$('iframe')
 
-    let fullname = `${this.couseTitle}_${classId}`
+      let fullname = `${this.couseTitle}_${classId}`
+      // 
+      // 有的课程的形考，有多个论述题，所以文件名里需要添加lessonId
+      let answerText = "";
+      let filepath = `./db/subjects/${fullname}_final.txt`
+      if( type == 'xingkaofinal'){
+        filepath = `./db/subjects/${fullname}_${lessonType}_${lessonId}.txt`
+      } 
+      if( fs.existsSync( filepath )){
+        answerText = fs.readFileSync(filepath,'utf8')
 
-    let answerText = "";
-    let filepath = `./db/subjects/${fullname}_final.txt`
-    if( fs.existsSync( filepath )){
-      filepath = `./db/subjects/final/${this.couseTitle}.txt`
-      answerText = fs.readFileSync(filepath,'utf8')
+      }else{
+        filepath = `./db/subjects/final/${this.couseTitle}.txt`
+        answerText = fs.readFileSync(filepath,'utf8')
+      }
 
-    }else{
-      filepath = `./db/subjects/final/${this.couseTitle}.txt`
-      answerText = fs.readFileSync(filepath,'utf8')
+      await textBody.focus();
+      await page.keyboard.down('Control');
+      await page.keyboard.press('KeyA');
+      await page.keyboard.up('Control');
+      await page.keyboard.press('Delete');
+      await textBody.type( answerText )
+
+    }else if( label=="文件提交"){
+      // 提交文件
+
+      await page.waitForSelector('.filemanager .filemanager-container' ).catch(async(e)=>{
+        log.error( " TimeoutError: waiting for selector filemanager", e)
+        await page.reload()
+      }); 
+
+      // 多等一会  failed: timeout 30000ms exceeded
+
+      let fullname = `${this.couseTitle}_${classId}`
+
+      let filepath = `./db/answers/${fullname}/${lessonType}_${lessonId}.txt`
+      if( !fs.existsSync( filepath )){
+        filepath = `./db/answers/${fullname}/${lessonType}_${lessonId}.doc`
+      } 
+      if( !fs.existsSync( filepath )){
+        filepath = `./db/subjects/final/${this.couseTitle}.txt`
+      } 
+      log.debug( "filepath=", filepath)
+      const uploaded = await page.$('.fp-content .fp-file')
+      if( uploaded ){
+        await uploaded.click()
+        await page.waitForSelector( '.filemanager button.fp-file-delete')
+        let delbutton = await page.$( '.filemanager button.fp-file-delete')
+        await delbutton.click()
+        const confirmButton = await page.$( '.filemanager button.fp-dlg-butconfirm'  )
+        await confirmButton.click()
+        // 延时以免数据没有提交成功
+        await handleDelay(300);
+      }
+      const addbutton = await page.$('.fp-toolbar .fp-btn-add a')
+
+      await addbutton.click()
+      await page.waitForSelector( '.moodle-dialogue')
+      let nav = await page.$('.fp-repo-area .nav-item:nth-child(2) a')
+      await nav.click()
+      await page.waitForSelector( '.moodle-dialogue input[name=repo_upload_file]')
+
+      let selbutton = await page.$('.moodle-dialogue input[name=repo_upload_file]')
+
+      await selbutton.uploadFile(filepath)
+      const uploadButton = await page.$('.file-picker  button.fp-upload-btn')
+      await uploadButton.click()
+
+
+      log.debug("提交文件", filepath)
+      await handleDelay(1500);
 
     }
-
-    await textBody.focus();
-    await page.keyboard.down('Control');
-    await page.keyboard.press('KeyA');
-    await page.keyboard.up('Control');
-    await page.keyboard.press('Delete');
-    await textBody.type( answerText )
 
     await page.waitForSelector('.form-group input.btn-primary');
     const saveButton = await page.$('.form-group input.btn-primary')
@@ -457,19 +527,92 @@ class BotPlus {
     await handleDelay(300);
 
     // 点击提交按钮
-    if( options.submitfinal == 'yes'){
+    if( options.submitquiz == 'yes'){
+
       let submitButtonCss = '.submissionaction:last-child form button.btn-secondary'
       await page.waitForSelector(submitButtonCss);
       const submitButton = await page.$(submitButtonCss)
       await submitButton.click()
       log.debug("点击提交按钮")
-      let confirmButtonCss = '.submitconfirm #id_submitbutton'
-      await page.waitForSelector(confirmButtonCss);
-      const confirmButton = await page.$( confirmButtonCss )
-      await confirmButton.click()
+
+      if( lessonType == 'assign'){
+        let confirmButtonCss = '.submitconfirm #id_submitbutton'
+        await page.waitForSelector(confirmButtonCss);
+  
+        let stateButtonCss = '#id_submissionstatement'
+        // 
+        const stateButton = await page.$( stateButtonCss )
+        if( stateButton ){
+          await stateButton.click()
+        }
+        const confirmButton = await page.$( confirmButtonCss )
+        await confirmButton.click()
+      }
+
       // 延时以免数据没有提交成功
       await handleDelay(300);
       log.debug("点击确认按钮")
+    }
+
+  }
+
+  async goForum(lesson, options) {
+    log.debug('=================goForum=================', options);
+
+    let driver = this.driver
+
+    let lessonType = lesson.type;
+    let lessonId = lesson.id
+    let url = lesson.url
+    let classId = lesson.classId
+    
+    let page = await driver.get(url)
+
+    await page.waitForSelector( '#newdiscussionform');
+    const [response] = await Promise.all([  page.waitForNavigation( ),  page.click("#newdiscussionform> button[type=submit]") ])
+
+    await handleDelay(1000);
+
+    // 可能会超时，需要重新加载
+    await page.waitForSelector('iframe', {timeout:5000}).catch(async(e)=>{
+      log.error( " TimeoutError: waiting for selector iframe", e)
+      await page.reload()
+    }); 
+
+    // 多等一会  failed: timeout 30000ms exceeded
+    const textBody = await page.$('iframe')
+
+    let fullname = `${this.couseTitle}_${classId}`
+    // 
+    // 有的课程的形考，有多个论述题，所以文件名里需要添加lessonId
+     
+    let filepath = `./db/subjects/${fullname}_${lessonType}_${lessonId}.txt`
+    // 第一行是标题，第二行是内容  
+    let answerText = fs.readFileSync(filepath,'utf8')
+    let lineEnd = answerText.indexOf( "\r\n")
+     
+    let title = answerText.slice(0,lineEnd)
+    
+    let body = answerText.slice(lineEnd+2)
+    log.debug( 'title', title, 'body', body)
+
+    await page.type('input#id_subject', title)
+    await textBody.focus();
+    await page.keyboard.down('Control');
+    await page.keyboard.press('KeyA');
+    await page.keyboard.up('Control');
+    await page.keyboard.press('Delete');
+    await textBody.type( body )
+
+    // 点击提交按钮
+    if( options.submitquiz == 'yes'){
+      let submitButtonCss = 'form#mformforum #id_submitbutton'
+      await page.waitForSelector(submitButtonCss);
+      const submitButton = await page.$(submitButtonCss)
+      await submitButton.click()
+      log.debug("点击提交按钮")       
+      // 延时以免数据没有提交成功
+      await handleDelay(1000);
     }
 
   }
@@ -486,9 +629,7 @@ class BotPlus {
     let id = lesson.id
     let classId = lesson.classId
     let sectionId = lesson.sectionId
-    if (isFinish == '未完成') {
-
-     
+          
       // http://shenyang.ouchn.cn/mod/url/view.php?id=526346
       let page = await driver.get(`http://${course.host}/mod/url/view.php?id=${id}`);
       // 可能被重定向到 xxx.pdf
@@ -498,7 +639,7 @@ class BotPlus {
         let script = `jQuery.ajaxSetup({ async : false}); var res = null; jQuery.getJSON('/theme/blueonionre/modulesCompletion.php?cmid=${id}&id=${classId}&sectionid=${sectionId}', function(data){ res = data; }); ;`
         // "视频播放延时1秒, 防止API没有成功！"
         let res = await page.evaluate(script);
-        await handleDelay(300);
+        await handleDelay(500);
          
         success = (res == 1)
         log.info(`视频播放成功${success}`);
@@ -507,7 +648,7 @@ class BotPlus {
         handleBotError( this, ex )
 
       }
-    }
+    
     return success
 
   }
@@ -588,7 +729,7 @@ class BotPlus {
     let quizArray = []
     
     if( byreview ) {
-      quizArray = await copyQuizBaseByReview( this.driver, urlbase, lessons )
+      quizArray = await copyQuizBaseByReview( this.driver, urlbase, lessons, filter  )
     }else{
       quizArray = await copyQuizBase( this.driver, urlbase, lessons, filter )
     }
@@ -598,8 +739,8 @@ class BotPlus {
     let answerStr = ''
     let LE =  "\r\n"
     for( let i=0; i<quizArray.length; i++){
-      let quiz = quizArray[i];
-      answerStr = answerStr.concat( `形考${(i+1)} ${LE}` )
+      let { id, quiz } = quizArray[i];
+      answerStr = answerStr.concat( `[形考${id}] ${i+1}${LE}` )
       for( let j = 0; j<quiz.length; j++ ){
         let question = quiz[j]
         let { title, options, type, answer, subquetions, classType} = question
@@ -608,11 +749,15 @@ class BotPlus {
         if( classType =='description'){
           line =  title + LE
         }else if( classType == 'multichoice'){
-          line =  `问题[${classType}] ${title} ${LE}${options} ${LE}答案 ${answer} ${LE}`
+          line =  `[问题${classType}] ${title} ${LE}${options} ${LE}[答案] ${answer} ${LE}`
         }else if( classType == 'truefalse'){
-          line =  `问题[${classType}] ${title} ${LE}${options} ${LE}答案 ${answer} ${LE}`
+          line =  `[问题${classType}] ${title} ${LE}${options} ${LE}[答案] ${answer} ${LE}`
         }else if( classType == 'multianswer'){
-          line =  `问题[${classType}] ${title} ${LE}${subquetions} ${LE}答案 ${answer} ${LE}`
+          line =  `[问题${classType}] ${title} ${LE}[答案] ${answer} ${LE}`
+        }else if( classType == 'essay'){
+          line =  `[问题${classType}] ${title} ${LE}[答案] ${answer} ${LE}`
+        }else if( classType == 'shortanswer'){
+          line =  `[问题${classType}] ${title} ${LE}[答案] ${answer} ${LE}`
         }
 
         answerStr = answerStr.concat( line )
@@ -623,23 +768,22 @@ class BotPlus {
 
     let answerList = []
     for( let i=0; i<quizArray.length; i++){
-      let quiz = quizArray[i];
+      let { id, quiz }  = quizArray[i];
       // 有时为空，需要跳过
-      answerList[i] = []
+      let answers = []
 
       for( let j = 0; j<quiz.length; j++ ){
         let question = quiz[j]
-        let { title, options, type, answer, classType} = question
-        log.debug("classType=",classType, "i=",i, "j=",j,title)
-        
-        if( classType == 'multichoice'){
-          answerList[i].push( { title, answer })
-          
-        }else if( classType == 'truefalse'){
-          answerList[i].push( { title, answer })
+        // ismulti 是否为多选
+        let { title, options, type, answer, classType, ismulti} = question
+        log.debug("classType=", classType, "i=",i, "j=",j, title)
+        if( classType =='description'){
+          continue
         }
+        answers.push( { title, answer, classType, ismulti })
 
       }
+      answerList.push( { id, answers })
     }
     let answerjson = `db/answers/${fullname}${filter}.json`
 
@@ -656,7 +800,7 @@ class BotPlus {
      * 调用前需先调用 
      * @param {string} couseTitle -  如：“中国特色社会主义理论体系概论”
     */
-  async submitPlainQuiz( couseTitle  ) {
+  async submitPlainQuiz( couseTitle, filter= null, maxReview=0  ) {
 
     await this.prepareForLearn( couseTitle )
 
@@ -677,7 +821,7 @@ class BotPlus {
     let lessons = this.couseInfo.status
     
     
-    await submitPlainQuizBase( this.driver, urlbase, lessons )
+    await submitPlainQuizBase( this.driver, urlbase, lessons, filter, maxReview )
      
   }
 

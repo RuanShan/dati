@@ -12,3 +12,10 @@ lines terminated by '\r\n';
 node app.js  --username=1923001474389 --password=19870322 --type=video lmodules 6386_形势与政策
 
 node app.js  --username=1923001421269 --password=19750204 --type=video lmodules 6386_形势与政策
+
+
+# todo
+1921101401071,庄宇,19890207,成本会计
+2021101300006,池浩天,19981021,会计学概论
+2021101453553,陶立利,19710928,会计学概论
+ddwtos
