@@ -754,6 +754,8 @@ class BotPlus {
           line =  `[问题${classType}] ${title} ${LE}${options} ${LE}[答案] ${answer} ${LE}`
         }else if( classType == 'multianswer'){
           line =  `[问题${classType}] ${title} ${LE}[答案] ${answer} ${LE}`
+        }else if( classType == 'ddwtos'){
+          line =  `[问题${classType}] ${title} ${LE}[答案] ${answer} ${LE}`
         }else if( classType == 'essay'){
           line =  `[问题${classType}] ${title} ${LE}[答案] ${answer} ${LE}`
         }else if( classType == 'shortanswer'){

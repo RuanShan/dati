@@ -429,6 +429,12 @@ async function copyOneQuiz( page,  isFirstPage, url ){
       let subquetions = await questionEle.$$( '.subquestion')
       copyQuestion = { title: question.join(','), type: 'multianswer', subquetions: subquetions.length, classType  }
 
+    }else if(classType=='ddwtos'){
+      let question = await questionEle.$$eval( '.drags >span', nodes=> nodes.map( n=>n.innerText))
+      log.debug('ddwtos ', question);
+      let subquetions = await questionEle.$$( '.drags >span')
+      copyQuestion = { title: question, type: 'multianswer', subquetions: subquetions.length, classType  }
+
     }else{
         let answerWrap = await questionEle.$('.answer')
 
@@ -621,6 +627,10 @@ async function copyOneQuizByReview( page,  isFirstPage, reviewIndex=0 ){
       spans.forEach((ele)=>ele.remove())
       question = parsed.text
       answerWrap = await questionEle.$('.formulation')
+    }else if(classType=='ddwtos'){
+      question = await questionEle.$eval( '.qtext', node=> node.innerText)
+      answerWrap = await questionEle.$('.formulation')
+  
     }else{
       question = await questionEle.$eval( '.qtext', node=> node.innerText)
       answerWrap = await questionEle.$('.answer')
@@ -638,7 +648,6 @@ async function copyOneQuizByReview( page,  isFirstPage, reviewIndex=0 ){
     if( answerWrap ){
       let answer = answerWrap;
 
-      //let as =  await answer.$$eval('input', node=> node.value)
       let labels  = await answer.$$eval('label', nodes=> nodes.map( n=>n.innerText))
       // 正确的答案是“错”。
       // 正确答案是：质量互变规律
@@ -735,7 +744,10 @@ async function copyOneQuizByReview( page,  isFirstPage, reviewIndex=0 ){
           answers.push( inputvalue)
         }
         copyQuestion = { title: question, type: classType,  answer: answers, classType  }
+      }else if(classType == 'ddwtos'){
+        let answers = await questionEle.$$eval( '.drags >span', nodes=> nodes.map( n=>n.innerText))
 
+        copyQuestion = { title: question, type: classType,  answer: answers, classType  }
       }else if(classType == 'essay'){
         //let correct = await questionEle.$eval('.feedback', node=> node.innerText)
         let correctFileEle = await questionEle.$('.qtype_essay_response')
@@ -905,6 +917,10 @@ async function processOneQuiz( page, quizzes, lessonId, isFirstPage, questionInd
       spans.forEach((ele)=>ele.remove())
       question = parsed.text
       answerWrap = await questionEle.$('.formulation')
+    }else if(classType=='ddwtos'){
+      question = await questionEle.$eval( '.qtext', node=> node.innerText)
+      answerWrap = await questionEle.$('.formulation')
+  
     }else{
       question = await questionEle.$eval( '.qtext', node=> node.innerText)
       answerWrap = await questionEle.$('.answer')
@@ -1009,6 +1025,44 @@ async function processOneQuiz( page, quizzes, lessonId, isFirstPage, questionInd
         await page.keyboard.up('Control');
         await page.keyboard.press('Delete');
         await textBody.type( key.answer )
+
+      }else if(classType == 'ddwtos'){
+        let drops = await answerWrap.$$('.qtext .drop')
+ 
+        let choices = await answerWrap.$$('.drags .drag')
+        let choiceTexts = await answerWrap.$$eval('.drags .drag', nodes=> nodes.map( n=>n.innerText))
+        let answers = key.answer
+        log.debug( classType, 'answers=', answers, drops.length, choiceTexts, choices.length)
+        if( drops.length == answers.length){
+          for(let i=0;i<drops.length; i++){
+            let drop = drops[i]
+            let answer = answers[i]     
+            let choice = null      
+            for(let j=0;j<choiceTexts.length; j++){
+              log.debug("i=", i, "j=",j,choiceTexts[j],answer, choiceTexts[j].includes(answer) )
+              if( choiceTexts[j].includes(answer)){
+                choice = choices[j]
+                break
+              }
+            }
+            if( choice && drop){
+
+              // 移动 选项(choice) 到 对应的位置坑 (drop)
+              const start = await choice.boundingBox();
+              const end = await drop.boundingBox();
+              log.debug("choice && drop" , start , end)
+              await page.mouse.move(start.x, start.y);
+              await page.mouse.down();
+              await page.mouse.move(end.x + end.width/2,end.y+ end.height/2, {steps:50});
+              await handleDelay( )
+              await page.mouse.up();
+              await handleDelay( )
+            }
+
+          }
+
+        }
+
 
       }else{
         log.error(`无法处理试题类型 classType=${classType}   ${i}`,question);

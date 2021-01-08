@@ -187,7 +187,10 @@ function getQuestionClassType( elementClass){
     classType = 'essay'      
   }else if( elementClass.includes( 'shortanswer') ){
     classType = 'shortanswer'      
+  }else if( elementClass.includes( 'ddwtos') ){
+    classType = 'ddwtos'      
   }
+   
   return classType
 }
 
