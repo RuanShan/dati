@@ -111,8 +111,9 @@ class BotPlus {
     this.username = username
     this.password = password
     let driver = this.driver
-
-    let page = await driver.get('http://passport.ouchn.cn/Account/Login?ReturnUrl=%2Fconnect%2Fauthorize%2Fcallback%3Fclient_id%3Dstudentspace%26redirect_uri%3Dhttp%253A%252F%252Fstudent.ouchn.cn%252F%2523%252Fsignin-oidc%2523%26response_type%3Did_token%2520token%26scope%3Dopenid%2520profile%2520ouchnuser%2520ouchnstudentspaceapi%26state%3Df2b1c4eebd354996ab8f0c3b618f39d1%26nonce%3D044e6125331b4db298c6acf33b1058dd');
+    let url1 = 'http://passport.ouchn.cn/Account/Login?ReturnUrl=%2Fconnect%2Fauthorize%2Fcallback%3Fclient_id%3Dstudentspace%26redirect_uri%3Dhttp%253A%252F%252Fstudent.ouchn.cn%252F%2523%252Fsignin-oidc%2523%26response_type%3Did_token%2520token%26scope%3Dopenid%2520profile%2520ouchnuser%2520ouchnstudentspaceapi%2520offline_access%26state%3D3e1197c784234af2b9cf49089e7c94e5%26nonce%3D8054db32701f4f5c85a9323795fab166';
+    let url2 = 'http://passport.ouchn.cn/Account/Login?ReturnUrl=%2Fconnect%2Fauthorize%2Fcallback%3Fclient_id%3Dstudentspace%26redirect_uri%3Dhttp%253A%252F%252Fstudent.ouchn.cn%252F%2523%252Fsignin-oidc%2523%26response_type%3Did_token%2520token%26scope%3Dopenid%2520profile%2520ouchnuser%2520ouchnstudentspaceapi%26state%3Df2b1c4eebd354996ab8f0c3b618f39d1%26nonce%3D044e6125331b4db298c6acf33b1058dd'
+    let page = await driver.get(url1);
     //await driver.get('http://passport.ouchn.cn/Account/Login?ReturnUrl=%2F');
     await page.type('#username', username)
     await page.type('#password', password)
@@ -173,14 +174,14 @@ class BotPlus {
       let lesson = moduleStatus[i];
       let { isFinish, url, type, title, sectionTitle } = lesson;
        
-       
-      log.debug( `课程学习中 typeFilter${typeFilter}`, !isXingkaoLessonTitle( title, sectionTitle )  )
+      let matchType =  (typeFilter.search( type )>=0);
+      log.debug( `课程学习中 typeFilter=${typeFilter} type= ${type}  matchType=${matchType}`, !isXingkaoLessonTitle( title, sectionTitle )  )
 
       if( typeFilter.startsWith( 'xingkao') ){
         if(  !isXingkaoLessonTitle( title, sectionTitle ) ){
           continue
         }
-      }else  if (  typeFilter != type) {
+      }else  if (  !matchType) {
         continue
       }
       
@@ -189,7 +190,13 @@ class BotPlus {
         
         log.debug(`学习小节${title} url=${url}`)
         let done = false
-        if (type == 'video') {
+        if (type=='ppt')   {
+          // pdf, ppt 学习
+         
+          await this.readPpt(lesson)
+          isFinish = '完成'
+
+        } else  if (type == 'video') {
           //http://anhui.ouchn.cn/course/view.php?id=4257&sectionid=91623&mid=561704
           let success = await this.watchVideoByApi(lesson)
           if (success) {
@@ -311,6 +318,36 @@ class BotPlus {
       log.debug(`after reading${ title}`);
 
     }
+  }
+  
+  async readPpt(lesson) {
+    var driver = this.driver
+    let success = true
+
+    let isFinish = lesson.isFinish;
+    let lessonId = lesson.id
+
+    if (isFinish == '未完成') {
+      let { host  } = CouseUrlMap[this.couseTitle]
+      let url = `http://${host}/mod/url/view.php?id=${lessonId}`
+
+      let title = lesson.title
+
+      let page = await driver.get(url);
+      log.debug(`before reading ${ title}`);
+      // 点击进入
+      try {
+        let enterButton = await page.$( '#ck a')
+        await enterButton.click()
+        await handleDelay(500);
+      } catch (ex) {
+        success = false
+        log.error('PPT播放失败：' + lessonId, ex);
+      }
+      log.debug(`after reading${ title}`);
+
+    }
+    return success
 
   }
 
@@ -506,12 +543,12 @@ class BotPlus {
       await page.waitForSelector( '.moodle-dialogue')
       let nav = await page.$('.fp-repo-area .nav-item:nth-child(2) a')
       await nav.click()
-      await page.waitForSelector( '.moodle-dialogue input[name=repo_upload_file]')
+      await page.waitForSelector( '.moodle-dialogue input[type=file]')
 
-      let selbutton = await page.$('.moodle-dialogue input[name=repo_upload_file]')
+      let selbutton = await page.$('.moodle-dialogue input[type=file]')
 
       await selbutton.uploadFile(filepath)
-      const uploadButton = await page.$('.file-picker  button.fp-upload-btn')
+      const uploadButton = await page.$('.moodle-dialogue   button.fp-upload-btn')
       await uploadButton.click()
 
 
@@ -528,6 +565,7 @@ class BotPlus {
 
     // 点击提交按钮
     if( options.submitquiz == 'yes'){
+      log.debug("查找提交按钮")
 
       let submitButtonCss = '.submissionaction:last-child form button.btn-secondary'
       await page.waitForSelector(submitButtonCss);
@@ -536,7 +574,7 @@ class BotPlus {
       log.debug("点击提交按钮")
 
       if( lessonType == 'assign'){
-        let confirmButtonCss = '.submitconfirm #id_submitbutton'
+        let confirmButtonCss = '#id_submitbutton'
         await page.waitForSelector(confirmButtonCss);
   
         let stateButtonCss = '#id_submissionstatement'
@@ -709,7 +747,7 @@ class BotPlus {
 
     let { byreview, filter} = options
     await this.prepareForLearn( couseTitle )
-
+console.debug( 'copyQuiz', couseTitle, CouseUrlMap, options)
     let {
       title,
       code,
@@ -843,10 +881,12 @@ class BotPlus {
     let browser = driver.browser
     let mainPage = this.mainPage //await driver.getWindowHandle()
     let links = await this.getCousesLinks(mainPage, couseTitle);
+
     if (links.length == 0) {
       log.error(`无法找到课程 ${couseTitle}`)
       return false
     }
+    log.info( `找到课程 ${couseTitle}`)
     //log.debug( 'links', links.length)
     // https://segmentfault.com/q/1010000019135401
     // https://www.zhihu.com/question/306082778/answer/556674503
@@ -1036,7 +1076,7 @@ class BotPlus {
     // 支持的课程
     let links = []
     try{
-    
+      await handleDelay(500);
       await page.waitForSelector('#zaixuekecheng .media');
       let div = await page.$('#zaixuekecheng');
       let couses = await page.$$('#zaixuekecheng .media');

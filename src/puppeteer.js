@@ -1,5 +1,7 @@
-const puppeteer = require('puppeteer');
-const iPhone = puppeteer.devices['iPhone 6'];
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+puppeteer.use( StealthPlugin());
+//const iPhone = puppeteer.devices['iPhone 6'];
 const { log } = require('./logger');
 
 const LAUNCH_PUPPETEER_OPTS = {
@@ -17,7 +19,8 @@ const LAUNCH_PUPPETEER_OPTS = {
     "--proxy-server='direct://'", 
     '--proxy-bypass-list=*'
   ],
-  defaultViewport:{ width: 1024, height:768 }
+  defaultViewport:{ width: 1024, height:768 },
+  ignoreDefaultArgs: ["--enable-automation"]
 };
 
 const PAGE_PUPPETEER_OPTS = {
@@ -58,7 +61,27 @@ class PuppeteerDriver {
     }
     // 如果没有打开的再创建
     let newPage = await this.browser.newPage();
-    
+
+    // 
+    const userAgent = 'Mozilla/5.0 (X11; Linux x86_64)' +
+  'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.39 Safari/537.36';
+    await newPage.setUserAgent(userAgent);
+
+    await newPage.evaluateOnNewDocument(() => {
+      const newProto = navigator.__proto__;
+      delete newProto.webdriver;
+      navigator.__proto__ = newProto;
+    });
+
+    //   // We can mock this in as much depth as we need for the test.
+    //   window.navigator.chrome = {
+    //     runtime: {},
+    //     // etc.
+    //   };
+    // });
+
+   
+
     log.debug( '准备打开', url )
     
     await Promise.all( [ newPage.waitForNavigation(), newPage.goto(url, PAGE_PUPPETEER_OPTS)]).catch(async e=>{

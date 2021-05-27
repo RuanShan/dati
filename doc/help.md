@@ -11,7 +11,7 @@
 会计(专科)：成本会计,市场营销学
 行政管理(本科):
 小学教育(本科):比较初等教育
-
+工商管理(专升本):金融学
 ## 生成EXE文件
 pkg .
 
@@ -35,11 +35,19 @@ node app.js --type=video createModuleFile 习近平新时代中国特色社会�
 node app.js  --username=1921101203721 --password=19930930 lmodule 习近平新时代中国特色社会主义思想 438064
 
 node app.js  --account=accountx.csv --type=video lmodules 习近平新时代中国特色社会主义思想
+ 
 
 node app.js  --account=account.json --type=quiz --submitquiz=yes lmodules 3945
 
+# 提交空白测试
+node appplus.js  --account=202012/accounts0.csv submitquiz 2
+# 生成形考答案
 node appplus.js  --account=202012/accounts0.csv genxingkao byreview
+# 形考答题
 node appplus.js  --account=20201229/accounts0.csv --type=xingkao --submitquiz=yes simplelearn
+
+node appplus.js  --account=20210408/account.csv --type='page,video,ppt' simplelearn
+
 ### 操作步骤
 1. node app.js  --username=2021101401106 --password=19700221 createlog 国家开放大学学习指南
 2. node app.js --type=video createModuleFile 3945_习近平新时代中国特色社会主义思想
@@ -49,6 +57,11 @@ node appplus.js  --account=20201229/accounts0.csv --type=xingkao --submitquiz=ye
 
 0. node app.js  --account=db/courses.csv gensubject
 0. node app.js  --account=account.json genaccount
+# 获取账号的所有课程数据信息
+node appplus.js  --account=20210408/student.csv getcouses
+# 解析生成的课程CSV
+node appplus.js  parsecsv
+
 # 学习答题
 0. node appplus.js  --account=db/courses.csv --type=quiz --submitquiz=yes  simplelearn
 # 查成绩

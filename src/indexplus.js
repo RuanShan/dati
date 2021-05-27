@@ -11,7 +11,7 @@ const {
   BotPlus,  
 } = require('./botplus.js');
 const {
-  buildXingkaoJsonPlus
+  handleDelay,buildXingkaoJsonPlus
 } = require('./utilplus')
 
 const {
@@ -136,25 +136,6 @@ async function handleCreateDb(accounts=[] ) {
   await driver.quit()
 }
 
-async function handleCreateLog(courseCode, username, password ) {
-  if( !username || !password){
-    throw  new Error( "用户名和密码是必须的")
-  }
-  courseCode = courseCode.trim();
-
-  let driver = new PuppeteerDriver();
-  let bot = new Bot(driver)
-  console.log(" bot doing profile a course")
-    // 1934001474084
-    // 19930902
-  await bot.login(username, password)
-  await bot.prepareForLearn(courseCode)
-  await bot.profileCouse(courseCode)
-  await bot.createAnswerList(courseCode)
-  await driver.quit()
-  //return bot
-}
-
  
 async function handleReadScore(courseCode, username, password){
   let driver = new PuppeteerDriver();
@@ -234,24 +215,7 @@ async function handleLearnCourses(accounts=[] , options = {}) {
   await driver.quit()
 }
 
-async function handleLearnCourse(courseCode, username, password) {
-  if( !username || !password){
-    throw  new Error( "用户名和密码是必须的")
-  }
 
-  let driver = new PuppeteerDriver();
-  let bot = new Bot(driver, {username})
-  console.log(" 机器人初始化成功，开始学习课程")
-  let log = await bot.getLog( courseCode)
-  if( log ){
-    await bot.login(username, password)
-    await bot.prepareForLearn(courseCode)
-    await bot.learnCouse()
-  }else{
-    console.error("没有找到课程数据文件："+ courseCode )
-  }
-  await driver.quit()
-}
 
 // 学习某一个人的一节课
 async function handleLearnModuleByCode(courseCode, moduleCode,username, password, options) {
@@ -506,6 +470,12 @@ async function simpleLearn(accounts, options={}) {
           log.info( `课程进度`, accountInfo)
           // 如果当前课程可以学习
 
+          // 5.0 学习时需要多种类型一起学习，比如，视频课程后有pdf需要看，然后才能下一章，这时需要同时学习多种类型课程
+          // type =  'video,pdf'
+          if( type.search(',')>=0 ){
+            await bot.learnCouse({ type: type })
+          }
+
           // 5.1 学习单元测试，并保存进度
           if( (   type=='page') && !accountInfo.pagedone ){
             await bot.learnCouse({ type: 'page' })
@@ -569,6 +539,134 @@ async function simpleLearn(accounts, options={}) {
 }
 
 
+/**
+ * 学习账号文件中的课程，只需提供账号，密码，课程名称, 
+ * 对于视频课无法一直秒过的情况，循环课程然后再循环账号。
+ * @param {Array} accounts { username, password, subject: 课程名称 }
+ * @param {Object} options { type: video }
+ */
+
+ async function simpleLearnVideo(accounts, options={}) {
+
+  log.info( "配置", config)
+  let driver = new PuppeteerDriver();
+  let { type, submitquiz } = options
+  let bot = new Bot(driver )
+  log.info("开始学习课程 人数=", accounts.length)
+
+  //2. 学习每门课读取一个视频
+  //for (let i = 0; i < maxTimes; i++) {
+    for (let j = 0; j < accounts.length; j++) {
+      // 每门课读取一个视频
+      let account = accounts[j]
+      let { username, password, subject} = account
+      
+      log.debug(  `${j+1} 用户名=${username},密码=${password}, 课程=${subject}` )
+      
+      // 课程信息 { code, title, url, host }
+      let couseBaseInfo = null;
+      
+      
+      // 1. 检查登录是否成功
+      let islogin = await bot.login( username, password )
+
+      // 2. 检查课程是否存在，查询课程代码
+       
+      couseBaseInfo = await bot.prepareForLearn(subject)
+
+      log.debug( "课程基本信息", couseBaseInfo)
+      // 课程代码在前，内部使用，作为课程文件命名
+
+      
+      // 3. 根据课程代码，查询课程数据文件
+
+        // {success, path }
+        let subjectfile = bot.getSubjectDataFilePath( couseBaseInfo )
+        
+        isFileExists =  fs.existsSync(subjectfile )
+        let isSubjectLoaded= false
+        if( !isFileExists ){
+          let success = await produceSubjectFile( bot, couseBaseInfo )
+
+          if( success){
+            // 如果存在需要加载课程数据
+            isFileExists = true
+          
+          }else{
+            log.error( `${accountstr} 课程数据文件生成异常 ${subjectfile}`)
+          }
+        }
+         
+
+        
+          
+        // 4. 查询用户账号数据文件，查询当前用户当前课程进度
+      // 
+      let key = username+'_'+couseBaseInfo.code 
+      let accountInfo = getAccount( key )
+      
+      
+      if( accountInfo == null ){
+        accountInfo = { username, password, subject, islogin: islogin, isexist: true, code: couseBaseInfo.code, videodone: false, quizdone: false, pagedone: false, xingkaodone: false, finaldone: false, forumdone: false }
+      }
+
+      if( accountInfo['videodone'] ){
+        continue;
+      }
+
+      isSubjectLoaded = await bot.getLog( couseBaseInfo.title, { filename: subjectfile } )
+
+      let lessons = bot.couseInfo.status;
+      // 查找用户可以学习的一个视频课程
+      let alldone = true;
+      let filter  = type || 'video,ppt';
+      for (let k = 0; k < lessons.length; k++) {
+        let lesson = lessons[k];
+        // ppt 也需要看才能继续
+        
+        if( filter.includes(lesson.type)){
+          let lessonKey = `${lesson.classId}_${lesson.id}`;
+          let lessondone = accountInfo[lessonKey];
+
+          if( !lessondone ){
+            // learn lesson, save account
+
+            if( lesson.type == 'video' ){
+              success = await bot.watchVideoByApi(lesson)
+
+            }else if( lesson.type == 'ppt' ){
+              success = await bot.readPpt(lesson)
+            }else if( lesson.type == 'quiz' && filter.includes('quiz')){
+              success = await bot.goQuiz(lesson,  options)
+            }
+
+            accountInfo[lessonKey] = success;
+            // 8. 保存账号数据
+            addAccount( accountInfo )  
+
+            // login again for next time
+            await bot.logout()
+            await bot.login( username, password )
+
+             
+          }
+        }
+      }
+      // complete all video  of this subject
+     
+      accountInfo['videodone'] = true;
+      addAccount( accountInfo )  
+     
+      log.info( `课程进度`, accountInfo)
+           
+        
+      
+      await bot.logout()
+
+    }
+  //}
+  await driver.quit()
+}
  
 
 async function getAllCouses( accounts){
@@ -659,88 +757,72 @@ async function handleLearnFinal(accounts, courseTitle, options ) {
 
 // 生成账号对应的课程数据文件
 async function handleGenSubject( accounts ){
-  // 相同的课程只处理一个
 
+  let driver = new PuppeteerDriver();
+ 
+  let bot = new Bot(driver )
+  log.info("开始学习课程 人数=", accounts.length)
 
-  // 根据账号生成 数据文件
-
-  let gensubjectlog = './db/log/gensubject.log'
-  let logs=[]
-  let gencouseerror = {} // { code: error }
+  //1  创建课程数据文件，读取课程视频数据信息
   for (let i = 0; i < accounts.length; i++) {
-
+    //
     let account = accounts[i]
-    let log = Object.assign( {}, account )
-    let username = account.username
-    let password = account.password
-    let couseName = account.subject // 课程名称
-    let driver = new PuppeteerDriver();
-    let bot = new Bot(driver)
-
-    couseName = couseName.trim()
-    let isexist = true
-    let islogin = await bot.login(username, password)
-    let couse = null
-    let gencouse = true
-    if( islogin){
-      couse = await bot.prepareForLearn(couseName)
-    }
-
-    if( couse ){
-      // 课程代码在前，内部使用，作为课程文件命名
-      let couseFullname = `${couse.code}_${couse.title}`
-      let subjectfile = `./db/subjects/${couseFullname}.json`
-      isexist =  fs.existsSync(subjectfile )
-      // 如果文件存在则跳过
-      iserror = gencouseerror[couse.code] === false
-      if( !isexist && !iserror){
-        await bot.profileCouse(couseName).catch((e)=>{
-          gencouse = false
-          gencouseerror[couse.code] = false
-        })
-
-        if( gencouse ){
-          //await bot.createAnswerList(couseName)
+    let { username, password, subject } = account
     
-          // 1. ./db/students/2021201400283_习近平新时代中国特色社会主义思想.json
-          let studentfile = await bot.getCouseJsonPath( bot.couseTitle )
-          // 重命名
+    let accountstr = `${i} 用户名=${username},密码=${password}, 课程=${subject}`;
+     
+    // 课程信息 { code, title, url, host }
+    let couseBaseInfo = null;
+     
+    // 1. 检查登录是否成功
+    let islogin = await bot.login( username, password )
+    let isFileExists = false
+    // 2. 检查课程是否存在，查询课程代码
+    if( islogin){
+      couseBaseInfo = await bot.prepareForLearn(subject)
+
+      log.debug( "课程基本信息", couseBaseInfo)
+      // 课程代码在前，内部使用，作为课程文件命名
+
       
-          let moduleType = 'video'
-          console.log( studentfile, subjectfile )
-          fs.copyFileSync( studentfile, subjectfile )
-          // 2.1 创建视频数据文件
-          createModuleFile( couseFullname, moduleType )
-          // 2.2 创建测单元验数据文件
-          moduleType = 'quiz'
-          createModuleFile( couseFullname, moduleType )
-          // 2.3 创建文章数据文件
-          moduleType = 'page'
-          createModuleFile( couseFullname, moduleType )
-      
-          // 3. 创建可执行文件, 文件的最后4个字符为课程号，
-          let couseFullname2 = `${couse.title}_${couse.code}`
-          createBinFile(couseFullname2)
-      
-          // 4. 添加课程数据到indexdb.json
-          addCouseIntoDb( couse.code, couse.title )
+      // 3. 根据课程代码，查询课程数据文件
+
+      if ( couseBaseInfo ){ 
+        // {success, path }
+        let subjectfile = bot.getSubjectDataFilePath( couseBaseInfo )
+        
+        isFileExists =  fs.existsSync(subjectfile )
+        let isSubjectLoaded= false
+        console.debug('produceSubjectFile=', subjectfile, isFileExists)
+        if( !isFileExists ){
+          let success = await produceSubjectFile( bot, couseBaseInfo )
+
+          if( success){
+            // 如果存在需要加载课程数据
+            isFileExists = true
+          
+          }else{
+            log.error( `${accountstr} 课程数据文件生成异常 ${subjectfile}`)
+          }
+        }
+        if( isFileExists ){
+          // 设置当前课程，加载课程数据文件
+          isSubjectLoaded = await bot.getLog( couseBaseInfo.title, { filename: subjectfile } )
+        }else{
+          log.error( `${accountstr} 没有找到课程数据文件 ${subjectfile}`)
         }
 
+      }else{
+        log.error(  `${accountstr} 没有找到课程`)
       }
-    
+
+    }else{
+      log.error(  `${accountstr} 登录失败`)
     }
-
-    // 记录日志
-    log.subjectexists = isexist
-    log.loginsuccess = islogin
-    log.cousefound = !!couse
-    log.gencouse = gencouse
-    logs.push( log )
-    fs.writeFileSync(gensubjectlog, JSON.stringify(logs))
-    await driver.quit()
-
-
+    await bot.logout()
   }
+  await driver.quit()
+  
 }
 
 async function handleGenAccounts( accounts ){
@@ -893,8 +975,6 @@ async function handleGenQuizByTxt(  file){
 module.exports = {
   handleAccountsCheckin,
   handleCreateDb,
-  handleCreateLog,
-  handleLearnCourse,
   handleLearnCourses,
   handleGetCourseSumaries,
   handleLearnModuleByCode,
@@ -909,6 +989,7 @@ module.exports = {
   handleSubmitPlainQuiz,
   handleGenQuizByTxt,
   simpleLearn,
+  simpleLearnVideo,
   getAllCouses,
   
 }

@@ -15,7 +15,6 @@ const enableVideoApi = true
 const {
   handleCreateDb,
   handleAccountsCheckin,
-  handleCreateLog,
    handleLearnCourses,
   handleLearnModuleByCode,
   handleGetCourseSumaries,
@@ -29,6 +28,7 @@ const {
   handleSubmitPlainQuiz,
   handleGenQuizByTxt,
   simpleLearn,
+  simpleLearnVideo,
   getAllCouses
 } = require('./src/indexplus')
 
@@ -45,12 +45,7 @@ program
   .option('-s, --submitquiz <yes|no>', 'submit quiz  yes or no')
   .option('-t, --type <type>', 'module type') // 学习的类型
 
-program.command('createlog <course>')
-  .description('handleCreateLog')
-  .action(function(course) {
-    console.log("handleCreateLog ", course, program.username, program.password)
-    handleCreateLog(course, program.username, program.password)
-  })
+
 
  
 
@@ -70,7 +65,23 @@ program.command('simplelearn')
     await simpleLearn(accounts, options)
   })
 
- 
+program.command('simplelearnvideo')
+.description('simple learn video')
+.action(async function( ) {
+  if (!isAvaible()) {
+    console.log("软件出现问题，请联系开发人员！")
+    return
+  }
+  
+  let type = ( program.type || null)
+  let submitquiz = ( program.submitquiz || null)
+  let options = { type, submitquiz }
+
+  let accounts = await getAccounts()  
+      
+  await simpleLearnVideo(accounts, options)
+})  
+
 
 program.command('lmodule <course> <module>')
   .description('learn by code module')
@@ -155,9 +166,8 @@ program.command('summary')
       let sumaries = await handleGetCourseSumaries(accounts )
 
       // 保存文件
-      let basepath = program.base;
-      if( basepath ){
-        let filename = `${basepath}/summary-${(new Date).getTime()}.csv`
+ 
+        let filename = `summary-${(new Date).getTime()}.csv`
 
         console.log( "before save to file:", filename  )
         //fs.writeFileSync(filename, JSON.stringify(sumaries))
@@ -165,7 +175,7 @@ program.command('summary')
           fs.writeFileSync(filename, records)
           console.log( "after save to file:", filename )
         })
-      }
+     
 
     }
 
@@ -324,6 +334,7 @@ program.command( 'getcouses')
 
 })
 
+// 解析 生成的账号课程文件，subjects 
 program.command( 'parsecsv <filename>')  
 .description('解析账户数据文件')
 .action(async function( filename) {
@@ -446,9 +457,9 @@ console.log( `accounts = ${accounts.length}`)
         for( let i=0; i<accounts.length; i++){
           let account = accounts[i]
 
-          let {major, username, password, subjects} = account
+          let {major, username, password, couses} = account
 
-          let subjectArray = subjects.split( ',')
+          let subjectArray = couses.split( ',')
 
           for( let j = 0; j<subjectArray.length; j++){            
             let subject = subjectArray[j]
@@ -490,7 +501,7 @@ console.log( `accounts = ${accounts.length}`)
 }
 // 软件是否可用
 function isAvaible() {
-  let availabe = new Date('2021-12-30')
+  let availabe = new Date('2021-8-30')
   let now = new Date()
 
   if (now < availabe) {
