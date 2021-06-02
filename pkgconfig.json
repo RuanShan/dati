@@ -1,7 +1,7 @@
 {
 
     "scripts": "node_modules/selenium-webdriver/lib/atoms/**/*.js",
-    "assets": "views/**/*",
+    "assets": "node_modules/puppeteer-extra-plugin-stealth/**/*.*" ,
     "targets": [
       "host"
     ]

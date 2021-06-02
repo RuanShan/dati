@@ -589,12 +589,15 @@ async function copyOneQuizByReview( page,  isFirstPage, reviewIndex=0 ){
     
     currentUrl = currentUrl.replace( /&page=[0-9]/, '')
 
-    await page.goto( currentUrl + '&showall=1')
+    let url = currentUrl + '&showall=1'
+    await page.goto( url )
     await handleDelay( 500) 
-   
+    await handle503(page, url);
+
      
   }
   await handleDelay( 1000) 
+  // 503 问题
 
   await page.waitForSelector( queSelector );
 
@@ -851,6 +854,7 @@ console.debug( `${i} ${classType}`)
  */
 async function handleQuizBase( driver, url,  options, quizzes, lessonId){
   
+
 
   let startButtonSelector="div.quizstartbuttondiv button[type=submit]"
 
@@ -1309,5 +1313,7 @@ module.exports={
   handleQuizBase,
   copyQuizBase,
   copyQuizBaseByReview,
-  submitPlainQuizBase
+  submitPlainQuizBase,
+  submitOneQuiz,
+  copyOneQuizByReview
 }

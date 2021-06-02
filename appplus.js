@@ -43,6 +43,7 @@ program
   .option('-b, --base <basepath>', 'base path')
   .option('-m, --modulefile <modulefile>', 'module file')
   .option('-s, --submitquiz <yes|no>', 'submit quiz  yes or no')
+  .option('-a, --submitandcopy <yes|no>', 'submitandcopy quiz  yes or no')
   .option('-t, --type <type>', 'module type') // 学习的类型
 
 
@@ -75,7 +76,8 @@ program.command('simplelearnvideo')
   
   let type = ( program.type || null)
   let submitquiz = ( program.submitquiz || null)
-  let options = { type, submitquiz }
+  let submitandcopy = ( program.submitandcopy || null)
+  let options = { type, submitquiz, submitandcopy }
 
   let accounts = await getAccounts()  
       
@@ -116,6 +118,10 @@ program.command('readscore <course>')
 program.command('initdb [accountfile]')
   .description('create all courses db')
   .action(async function(accountfile) {
+    if (!isAvaible()) {
+      console.log("软件出现问题，请联系开发人员！")
+      return
+    }
     let accounts = await getAccounts(accountfile)
     console.log("创建课程db", accountfile, accounts.length)
 
@@ -338,7 +344,7 @@ program.command( 'getcouses')
 program.command( 'parsecsv <filename>')  
 .description('解析账户数据文件')
 .action(async function( filename) {
-  await parseSubjcts(filename)
+   await parseSubjcts(filename)
 })
 
 //
@@ -463,7 +469,7 @@ console.log( `accounts = ${accounts.length}`)
 
           for( let j = 0; j<subjectArray.length; j++){            
             let subject = subjectArray[j]
-            console.log( `subjectArray${j}= `,subjectArray, subject)
+            // console.log( `subjectArray${j}= `,subjectArray, subject)
             if( subject.length == 0){
               continue;
             }
@@ -501,7 +507,7 @@ console.log( `accounts = ${accounts.length}`)
 }
 // 软件是否可用
 function isAvaible() {
-  let availabe = new Date('2021-8-30')
+  let availabe = new Date('2021-7-30')
   let now = new Date()
 
   if (now < availabe) {

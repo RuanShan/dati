@@ -37,7 +37,9 @@ const {
   handleQuizBase,
   copyQuizBase,
   copyQuizBaseByReview,
-  submitPlainQuizBase
+  submitPlainQuizBase,
+  submitOneQuiz,
+  copyOneQuizByReview
 } = require('./couses/baseplus')
 
 class BotPlus {
@@ -339,7 +341,7 @@ class BotPlus {
       try {
         let enterButton = await page.$( '#ck a')
         await enterButton.click()
-        await handleDelay(500);
+        await handleDelay(10500);
       } catch (ex) {
         success = false
         log.error('PPT播放失败：' + lessonId, ex);
@@ -386,26 +388,53 @@ class BotPlus {
     let lessonId = lesson.id
 
 
-      //let url = lesson.url
-      let lessonTitle = lesson.title
-      let {
-        title,
-        code,
-        host
-      } = CouseUrlMap[this.couseTitle]
-      let url = `http://${host}/mod/quiz/view.php?id=${lessonId}`
+    //let url = lesson.url
+    let lessonTitle = lesson.title
+    let {
+      title,
+      code,
+      host
+    } = CouseUrlMap[this.couseTitle]
+    let url = `http://${host}/mod/quiz/view.php?id=${lessonId}`
 
-      let fullname = `${title}_${code}`
-      let answerfile = `./db/answers/${fullname}.json`
+    let fullname = `${title}_${code}`
+    let answerfile = `./db/answers/${fullname}.json`
+
+
+    let quizzes = []
+    let quiz = null
+    let exists  = fs.existsSync( answerfile );
+    if( exists ){
       let json = JSON.parse(fs.readFileSync(answerfile,'utf8'));
-      let answsers = json.answers
-      // 加载题库文件
+      quizzes = json.answers // {answers:[{id: answers:[{title,classType,answer}]}]}
 
-      log.log('this.couseTitle---:', this.couseTitle, lessonTitle);
-      
-      await handleQuizBase(driver, url, options, answsers, lessonId )
-      
-      log.log('this quiz is done');
+      quiz  = quizzes.find((a)=>a.id==lessonId)
+    }
+
+    // 检测题库中是否存在
+    // 是否允许提交空白测试，生成答案
+    if( !quiz){
+      if( options.submitandcopy){
+
+        quiz = await this.submitOnePlainQuizAndCopy( this.couseTitle, lesson  )
+
+        console.debug( ' 生成答案 =', quiz )
+        if( quiz.id && quiz.quiz.length>0 ){
+           
+          console.debug( '保存文件 =', fullname )
+
+          quizzes = addQuizIntoAnswerFile(quiz, quizzes,fullname, '' )
+        } 
+      }
+
+    }
+
+    // 加载题库文件
+    log.log('this.couseTitle---:', this.couseTitle, lessonTitle);
+    
+    await handleQuizBase(driver, url, options, quizzes, lessonId )
+    
+    log.log('this quiz is done');
   }
 
   async goXingkao(lesson,  options ) {
@@ -747,7 +776,7 @@ class BotPlus {
 
     let { byreview, filter} = options
     await this.prepareForLearn( couseTitle )
-console.debug( 'copyQuiz', couseTitle, CouseUrlMap, options)
+    console.debug( 'copyQuiz', couseTitle, CouseUrlMap, options)
     let {
       title,
       code,
@@ -865,6 +894,36 @@ console.debug( 'copyQuiz', couseTitle, CouseUrlMap, options)
      
   }
 
+  /**
+   * 提交一个空白单元测试并且copy答案，只用于公共课
+   */
+  async submitOnePlainQuizAndCopy(couseTitle, lesson, filter ){
+
+    let {     
+      host
+    } = CouseUrlMap[couseTitle]
+
+    let answers = null
+    let baseurl = `http://${host}/mod/quiz/view.php`
+
+
+    let {type, id, title, sectionTitle} = lesson
+    if( type == 'quiz'){
+       
+      let url = `${baseurl}?id=${id}`
+      let newPage = await this.driver.get( url )
+     
+        let quiz = await submitOneQuiz(newPage,  true, 1 )
+ 
+        newPage = await this.driver.get( url )
+        let aquiz = await copyOneQuizByReview(newPage,  true, 0)
+
+        answers =  { id, quiz: aquiz }
+
+    }
+    return answers;
+  }
+
 
   /**
    * 确定当前课程的url 和 code
@@ -936,7 +995,7 @@ console.debug( 'copyQuiz', couseTitle, CouseUrlMap, options)
     cousePage.close()
     // log.debug("current window url=", url)
     this.recursiveCount = 0
-
+console.debug( "prepareForLearn=", CouseUrlMap )
     return CouseUrlMap[couseTitle]
   }
 
@@ -1327,6 +1386,37 @@ async function handleSnapshot( bot, page, path ){
   //let path = `./db/log/${couseTitle}_${username}.jpg`
   await page.screenshot({type: 'jpeg', path: path})
   
+}
+
+function addQuizIntoAnswerFile(lessonquiz, originalQuizArray, fullname, filter ){
+        // 生成试题文件
+ 
+    
+        let answerList = []
+        let { id, quiz }  = lessonquiz;
+          // 有时为空，需要跳过
+          let answers = []
+    
+          for( let j = 0; j<quiz.length; j++ ){
+            let question = quiz[j]
+            // ismulti 是否为多选
+            let { title, options, type, answer, classType, ismulti} = question
+            log.debug("classType=", classType,  "j=",j, title)
+            if( classType =='description'){
+              continue
+            }
+            answers.push( { title, answer, classType, ismulti })
+    
+          }
+          answerList = originalQuizArray.concat([{ id, answers }])
+         
+        let answerjson = `db/answers/${fullname}${filter}.json`
+    
+        // 如果是形考题，并且原有题库，把新题添加到原有题库中
+    
+        // log.log( "answerjson", answerjson)
+        fs.writeFileSync(answerjson, JSON.stringify({ answers: answerList}));
+        return  answerList  
 }
 
 
