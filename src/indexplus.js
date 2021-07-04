@@ -399,7 +399,7 @@ async function simpleLearn(accounts, options={}) {
 
   log.info( "配置", config)
   let driver = new PuppeteerDriver();
-  let { type, submitquiz } = options
+  let { type, submitquiz, keyword } = options
   let bot = new Bot(driver )
   log.info("开始学习课程 人数=", accounts.length)
 
@@ -465,7 +465,7 @@ async function simpleLearn(accounts, options={}) {
 
           
           if( accountInfo == null ){
-            accountInfo = { username, password, subject, islogin: islogin, isexist:isFileExists, code: couseBaseInfo.code, videodone: false, quizdone: false, pagedone: false, xingkaodone: false, finaldone: false, forumdone: false }
+            accountInfo = { username, password, subject, islogin: islogin, isexist:isFileExists, code: couseBaseInfo.code, videodone: false, quizdone: false, pagedone: false, xingkaodone: false, finaldone: false, forumdone: false, xingweidone: false }
           }
           log.info( `课程进度`, accountInfo)
           // 如果当前课程可以学习
@@ -496,29 +496,43 @@ async function simpleLearn(accounts, options={}) {
           }
           // 5.4 形式考试
           if( (  type=='xingkao') && !accountInfo.xingkaodone ){
-            await bot.learnCouse({ type: 'xingkao', submitquiz: submitquiz })
+            await bot.learnCouse({ type: 'xingkao', submitquiz: submitquiz, keyword })
             if( submitquiz == 'yes'){
               accountInfo.xingkaodone = true
             }
           }
           // 5.5 论坛发帖
           if( (  type=='xingkaoforum') && !accountInfo.forumdone ){
-            await bot.learnCouse({ type: 'xingkaoforum', submitquiz: submitquiz })
-            if( submitquiz == 'yes'){
-              accountInfo.forumdone = true
-            }
+            await bot.learnCouse({ type: 'xingkaoforum', submitquiz: submitquiz, keyword })
+            // if( submitquiz == 'yes'){
+            //   accountInfo.forumdone = true
+            // }
           }
           // 5.6 形考论述
-          if( (  type=='xingkaofinal') && !accountInfo.finaldone ){
-            await bot.learnCouse({ type: 'xingkaofinal', submitquiz: submitquiz })
+          if( (  type=='xingkaofinal') && !accountInfo.xingkaofinaldone ){
+            await bot.learnCouse({ type: 'xingkaofinal', submitquiz: submitquiz, keyword })
             if( submitquiz == 'yes'){
-              accountInfo.finaldone = true
+              accountInfo.xingkaofinaldone = true
             }
           }
+          // 5.7 行为表现论述
+
+          if( (  type=='xingweifinal') && !accountInfo.xingweidone ){
+            // keyword = '行为表现', 社会实践
+            console.debug( 'keyword->', keyword)
+            await bot.learnFinal({ type: 'assign', submitquiz: submitquiz, keyword,  forceeditor: true })
+            if( submitquiz == 'yes'){
+              accountInfo.xingweidone = true
+            }
+          }
+
           // 7. 学习终结性考试，并保存进度
 
+          console.debug( 'before start final', type)
           if( (  type=='final') && !accountInfo.finaldone ){
+            console.debug( 'before start final2', type)
             await bot.learnFinal( { submitquiz:submitquiz } )       
+            console.debug( 'before start final3', type)
             accountInfo.finaldone = true
           }
           // 8. 保存账号数据

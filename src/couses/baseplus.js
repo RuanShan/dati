@@ -61,10 +61,11 @@ async function parseCouseBase(page) {
       // log.debug(`levelOne.text ${i} ${sectionId} ${sectionTitle} 没有内容。`)
       continue
     }
-    // 电大资源区，自建资源区
-    if( /课程文件|资源更新区|电大资源区|资源自建区|资源区/.test( sectionTitle )){
+    // 电大资源区
+    if( /课程文件|资源更新区|电大资源区|资源自建区/.test( sectionTitle )){
       continue
     }
+    // 自建资源区 需要解析，里面有作业
     // 课程文件, 资源更新区, 电大资源区
 
     const isHidden = await a.$eval(sectionl2Css, (elem) => {
@@ -224,6 +225,8 @@ async function parseCouseBase2( page ){
           type = 'boost_core'
         }else if( src.includes('boost/page')){
           type = 'boost_page'
+        }else if( src.includes('boost/quiz')){
+          type = 'quiz'
         }else if( src.includes('boost/assign')){
           type = 'boost_assign'
         } else if( src.includes('boost/forum')){
@@ -506,7 +509,7 @@ async function copyQuizBaseByReview(driver, baseurl, couseLessons, filter ) {
     let lesson = couseLessons[i];
 
     let {type, title, id, sectionTitle} = lesson
-    // console.debug( "copyQuizBaseByReview lesson=", lesson )
+    log.debug( "copyQuizBaseByReview lesson=", lesson )
     if( type == 'quiz'){
         // 访问url，读取所有试题，可能包含多页
       if( filter=='xingkao' && !(isXingkaoLessonTitle(title, sectionTitle))){        
@@ -516,7 +519,7 @@ async function copyQuizBaseByReview(driver, baseurl, couseLessons, filter ) {
       let newPage = await driver.get( url )
       let is503 = false
 
-      let buttons = await newPage.$$("table.quizattemptsummary td:last-child a")
+      let buttons = await newPage.$$("table.quizattemptsummary td a[title*='回顾']")
 
       let quiz = []
       log.debug( "review buttons ", buttons.length )
@@ -565,7 +568,7 @@ async function copyQuizBaseByReview(driver, baseurl, couseLessons, filter ) {
 async function copyOneQuizByReview( page,  isFirstPage, reviewIndex=0 ){
   // 读取课程分析文件
   // 选出所有的测试项目
-  let reviewButtonSelector="table.quizattemptsummary td:last-child  a"
+  let reviewButtonSelector="table.quizattemptsummary td a[title*='回顾']"
   let startButtonSelector="div.quizstartbuttondiv button[type=submit]"
   //let queXpath = "//div[@class='que truefalse deferredfeedback notyetanswered']"
   let queSelector = ".que"
@@ -596,7 +599,7 @@ async function copyOneQuizByReview( page,  isFirstPage, reviewIndex=0 ){
 
      
   }
-  await handleDelay( 1000) 
+  await handleDelay( 1500) 
   // 503 问题
 
   await page.waitForSelector( queSelector );
@@ -646,7 +649,7 @@ console.debug( `${i} ${classType}`)
     
     if(classType == 'description'){
       questionNum = 0; // 每一道题的下标
-      ismulti = false // 是否为多选
+      ismulti = question.includes( '多选题')  // 是否为多选
       copyQuestion = { title: question, type: 'h1', classType  }
       copys.push( copyQuestion)
       continue;
@@ -688,7 +691,20 @@ console.debug( `${i} ${classType}`)
         let generalfeedback = await questionEle.$('.feedback .generalfeedback')
         let correct = null
         if( rightanswer ){
+          // 
           correct = await questionEle.$eval('.feedback .rightanswer', node=> node.innerText)
+
+          let checkbox = await answer.$$("input[type='checkbox']")
+          let radio = await answer.$$("input[type='radio']")
+          // 如果正确答案>1 认为是多选题
+          if( checkbox.length>0){
+            ismulti = true
+          } 
+          if( radio.length>0){
+            ismulti = false
+          } 
+          log.debug( 'found checkbox ismulti', ismulti,  checkbox.length, question )
+
         }
         else if( generalfeedback ){
           // 从句子结构seek… to do something分析，需选择动词原形。所以答案是C。
@@ -707,6 +723,10 @@ console.debug( `${i} ${classType}`)
             let fixedCorrects = corrects.map( b => b.replace(/\s*/g,"").replace(".","").substring(1)  )
             log.debug( "corrects=", correctDivs.length, corrects, "question",question )
             correct = fixedCorrects.join(',')
+            // 如果正确答案>1 认为是多选题
+            if( correctDivs.length>1){
+              ismulti = true
+            }
           }
         }
 
@@ -716,7 +736,12 @@ console.debug( `${i} ${classType}`)
           // 网站bug，有时没有 promptEle 元素，这里需要判断一下
           let prompt = await questionEle.$eval('.prompt', node=> node.innerText)
           ismulti = prompt.includes( '选择一项或多项') 
+          log.debug( 'found prompt ismulti',ismulti)
         }
+
+        // 如果是 checkbox 也认为是多选题
+
+
         // a. 国家开放大学是基于信息技术的特殊的大学
         // let fixedLabels = labels.map( b => b.replace(/\s*/g,"").replace(".","").substring(1)  )
         // 有的选项中有换行符，去掉
@@ -1014,6 +1039,7 @@ async function processOneQuiz( page, quizzes, lessonId, isFirstPage, questionInd
             let corrects = key.answer.split(',')
             //  key.answer '正确答案是：增大金融风险, 削弱国家宏观经济政策的独立性和有效性, 加快金融危机在全球范围内的传递，增加了国际金融体系的脆弱性' 
             let found =   key.answer.includes(b) //corrects.find((a)=> b.includes(a))
+            console.debug( ' key.answer',  key.answer, b, found)
             if( found ){
               await label.click()
             }

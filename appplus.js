@@ -45,6 +45,7 @@ program
   .option('-s, --submitquiz <yes|no>', 'submit quiz  yes or no')
   .option('-a, --submitandcopy <yes|no>', 'submitandcopy quiz  yes or no')
   .option('-t, --type <type>', 'module type') // 学习的类型
+  .option('-k, --keyword <keyword>', '课程文本关键字') // 学习的内容需要包含的关键字
 
 
 
@@ -59,8 +60,9 @@ program.command('simplelearn')
     }
     let type = ( program.type || null)
     let submitquiz = ( program.submitquiz || null)
-    
-    let options = { type, submitquiz }
+    let keyword = ( program.keyword || null)
+
+    let options = { keyword, type, submitquiz }
     let accounts = await getAccounts()  
        
     await simpleLearn(accounts, options)
@@ -75,9 +77,10 @@ program.command('simplelearnvideo')
   }
   
   let type = ( program.type || null)
+  let keyword = ( program.keyword || null)
   let submitquiz = ( program.submitquiz || null)
   let submitandcopy = ( program.submitandcopy || null)
-  let options = { type, submitquiz, submitandcopy }
+  let options = { keyword, type, submitquiz, submitandcopy }
 
   let accounts = await getAccounts()  
       
@@ -109,6 +112,12 @@ program.command('lmodule <course> <module>')
 program.command('readscore <course>')
   .description('readscore by course code')
   .action(function(course) {
+
+    if (!isAvaible()) {
+      console.log("软件出现问题，请联系开发人员！")
+      return
+    }
+
     console.log("handleReadScore ", course)
     handleReadScore(course, program.username, program.password)
   })
@@ -134,7 +143,11 @@ program.command('initdb [accountfile]')
 program.command('checkin [accountfile]')
   .description('checkin all accounts, support json, csv')
   .action(async function(accountfile) {
-
+    if (!isAvaible()) {
+      console.log("软件出现问题，请联系开发人员！")
+      return
+    }
+    
     let accounts = await getAccounts(accountfile)
 
     console.log("检查账户登录...", accountfile)
@@ -148,6 +161,11 @@ program.command('checkin [accountfile]')
 program.command('getcode [accountfile]')
   .description('checkin all accounts, support json, csv')
   .action(async function(accountfile) {
+    if (!isAvaible()) {
+      console.log("软件出现问题，请联系开发人员！")
+      return
+    }
+    
     // [{username, password, subject}]
     let accounts = await getAccounts(accountfile)
 
@@ -272,7 +290,11 @@ program.command('genaccount')
 program.command( 'genquiz')  
 .description('生成测验数据文件')
 .action(async function(  ) {
-   
+  if (!isAvaible()) {
+    console.log("软件出现问题，请联系开发人员！")
+    return
+  }
+
   let accounts = await getAccounts( )
 
   console.log( "byreview=",  )
@@ -286,7 +308,11 @@ program.command( 'genquiz')
 program.command( 'genxingkao [byreview]')  
 .description('生成形考测验数据文件')
 .action(async function( byreview ) {
-   
+  if (!isAvaible()) {
+    console.log("软件出现问题，请联系开发人员！")
+    return
+  }
+
   let accounts = await getAccounts( )
  
   filter = 'xingkao'
@@ -312,6 +338,11 @@ program.command( 'genxingkaobytxt [file]')
 program.command( 'submitquiz [maxReview]')  
 .description('提交空白测试')
 .action(async function( maxReview ) {
+  if (!isAvaible()) {
+    console.log("软件出现问题，请联系开发人员！")
+    return
+  }
+
   let type = ( program.type || null)
   maxReview = maxReview || 0
   let accounts = await getAccounts( )
@@ -324,7 +355,11 @@ program.command( 'submitquiz [maxReview]')
 program.command( 'getcouses')  
 .description('生成账号课程文件')
 .action(async function(  ) {
-   
+  if (!isAvaible()) {
+    console.log("软件出现问题，请联系开发人员！")
+    return
+  }
+
   let accounts = await getAccounts( )
 
   let students = await getAllCouses(accounts)

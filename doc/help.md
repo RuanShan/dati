@@ -74,6 +74,9 @@ node appplus.js  --account=20201229/accounts0.csv --type=xingkao  genxingkao byr
 node appplus.js  --account=20201229/accounts1.csv --type=xingkaoforum --submitquiz=yes simplelearn
 # 形考论述题
 node appplus.js  --account=20201229/accounts1.csv --type=xingkaofinal --submitquiz=yes simplelearn
+
+node appplus.js  --account=20210517/1.csv --type=xingkaofinal --keyword=电子支付工具的使用 simplelearn
+
 ### TODO
 1. 添加功能，给定格式文件 生成这个课程的内容数据文件
 2. 添加功能，给定格式文件 生成这个课程的所有答案文件

@@ -2,11 +2,13 @@ const {
   scrollToBottom,
   playVideo,
   handleDelay,
+  handle503,
   buildCouseTitle,
   isXingkaoLessonTitle
 } = require('./utilplus')
 const fs = require('fs');
 const URL = require('url');
+var path = require('path');
 
 const { log } = require('./logger');
 
@@ -165,6 +167,7 @@ class BotPlus {
     
     
     let typeFilter = options.type
+    let keyword = options.keyword
 
     // log.debug( `课程学习中 ${this.couseTitle}`, '参数', options )
     
@@ -177,7 +180,7 @@ class BotPlus {
       let { isFinish, url, type, title, sectionTitle } = lesson;
        
       let matchType =  (typeFilter.search( type )>=0);
-      log.debug( `课程学习中 typeFilter=${typeFilter} type= ${type}  matchType=${matchType}`, !isXingkaoLessonTitle( title, sectionTitle )  )
+      // log.debug( `课程学习中 typeFilter=${typeFilter} type= ${type}  matchType=${matchType}`, title, isXingkaoLessonTitle( title, sectionTitle ) )
 
       if( typeFilter.startsWith( 'xingkao') ){
         if(  !isXingkaoLessonTitle( title, sectionTitle ) ){
@@ -188,11 +191,11 @@ class BotPlus {
       }
       
       try{
-       
+        let keywordIncluded = ( !keyword || title.includes( keyword ) )
         
-        log.debug(`学习小节${title} url=${url}`)
+        log.debug(`学习小节 ${keyword} ${title} url=${url}`)
         let done = false
-        if (type=='ppt')   {
+        if (type=='ppt' && !typeFilter.startsWith( 'xingkao'))   {
           // pdf, ppt 学习
          
           await this.readPpt(lesson)
@@ -204,7 +207,7 @@ class BotPlus {
           if (success) {
             isFinish = '完成'
           }
-        } else if (type=='page' && typeFilter != 'xingkao') {
+        } else if (type=='page' && !typeFilter.startsWith( 'xingkao')) {
           // 形考不处理页面
           if(url.includes('/mod/page/view')){
             await this.readText(lesson)
@@ -214,7 +217,7 @@ class BotPlus {
         } else if (type == 'quiz') {
           // 只有类型为答题时，再答题，以免多次答题
           if (typeFilter == 'xingkao') {
-            if( isXingkaoLessonTitle( title, sectionTitle )){
+            if( isXingkaoLessonTitle( title, sectionTitle ) && keywordIncluded){
               await this.goXingkao(lesson,  options)
             }
           }else if(typeFilter == 'quiz' )
@@ -222,18 +225,24 @@ class BotPlus {
             await this.goQuiz(lesson, options)
             isFinish = '完成'
           }
-        } else if (type == 'assign' || type == 'boost_assign') {
+        } if (type == 'assign' || type == 'boost_assign') {
           // 课程 parseCouseBase2 分析的结构 type = boost_assign， 如：幼儿园课程论
           // 形式考试，提交文件
           if (typeFilter == 'xingkaofinal') {
-            if( isXingkaoLessonTitle( title, sectionTitle )){
+            if( isXingkaoLessonTitle( title, sectionTitle ) && keywordIncluded){
               await this.goFinal(lesson,  options)
             }
           }
+          if (typeFilter == 'assign' && keywordIncluded) {
+             
+              await this.goFinal(lesson,  options)
+            
+          }
+          
         } else if (type == 'forum') {
           // 形式考试，提交文件
           if (typeFilter == 'xingkaoforum') {
-            if( isXingkaoLessonTitle( title, sectionTitle )){
+            if( isXingkaoLessonTitle( title, sectionTitle ) && keywordIncluded){
               await this.goForum(lesson,  options)
             }
           }
@@ -468,8 +477,10 @@ class BotPlus {
 
   // 处理提交文本的测试，一般为终结性考试
   async goFinal(lesson, options) {
+    // 如果是forceeditor， 表示强制使用编辑器重答
+    let forceeditor = options.forceeditor
     log.debug('=================goFinal=================', options);
-    let { type } = options
+    let { type, keyword } = options
     let driver = this.driver
 
     let lessonType = lesson.type;
@@ -477,17 +488,23 @@ class BotPlus {
     let url = lesson.url
     let classId = lesson.classId
 
+        // 即使课程号一致，url 也可能不一致， 需要替换成当前的课程url
+    url = this.fixLessonUrl( this.couseTitle, url)
+
     
     let page = await driver.get(url)
-    let submitted = await page.$( '.submissionstatussubmitted')
+    await handle503(page);
 
-    if( submitted){
+    let submitted = await page.$( '.submissionstatussubmitted') // 已提交请评分
+
+
+    if( submitted && !forceeditor){
       log.info("作业已经提交")
       return
     }
     let status = await page.$eval( '.submissionsummarytable tr:first-child td.lastcol', node=>node.innerText.trim() )
     log.info("final lesson status", status)
-    if( status == '这个作业不需要您在网上提交任何东西'){
+    if( status == '这个作业不需要您在网上提交任何东西' || status == '此作业不需要您在线提交任何东西'){
       log.info(status)
       return
     }
@@ -495,13 +512,93 @@ class BotPlus {
     const commitButton = await page.$( '.singlebutton button.btn-secondary')
     // 等待commit的click功能
     await commitButton.click()
-    await handleDelay(1500);
+    await handleDelay(2500);
     await page.waitForSelector( '.editsubmissionform .row .col-form-label');
+
+    let filemanager = await page.$( '#fitem_id_files_filemanager')
+    let editor = await page.$( '#fitem_id_onlinetext_editor')
 
     // 检查提交文本还是文件
     let label = await page.$eval( '.editsubmissionform .row .col-form-label', node=>node.innerText.trim() )
     log.debug("编辑按钮", label)
-    if( label == '在线文本'){
+    if(  filemanager  && !forceeditor){ //label=="文件提交"
+      // 提交文件
+
+      await page.waitForSelector('.filemanager .filemanager-container' ).catch(async(e)=>{
+        log.error( " TimeoutError: waiting for selector filemanager", e)
+        await page.reload()
+      }); 
+
+      // 多等一会  failed: timeout 30000ms exceeded
+
+      let fullname = `${this.couseTitle}_${classId}`
+
+      let filepath = `./db/answers/${fullname}/${lessonType}_${lessonId}.txt`
+      if( !fs.existsSync( filepath )){
+        //filepath = `./db/answers/${fullname}/${lessonType}_${lessonId}.doc`
+        let regex = `${fullname}_${lessonType}_${lessonId}.(txt|docx|ppt|pdf|doc)`
+        let foundfile = fromDir( `./db/subjects`, new RegExp(regex))
+        if( foundfile ){
+          filepath = `./db/subjects/${foundfile}`
+        }
+        console.debug(filepath, regex, foundfile )
+      } 
+      if( !fs.existsSync( filepath )){
+        // 计算机需要提交zip 文件
+        filepath = `./db/subjects/final/${this.couseTitle}.zip`
+      } 
+      if( !fs.existsSync( filepath )){
+        // 计算机需要提交zip 文件
+        filepath = `./db/subjects/final/${this.couseTitle}.doc`
+      } 
+
+      if( !fs.existsSync( filepath )){
+        filepath = `./db/subjects/final/${this.couseTitle}.txt`
+      } 
+      log.debug( "filepath=", filepath)
+      log.debug( "查找上传组件")
+      await handleDelay(500);
+
+      const uploaded = await page.$('.fp-content .fp-file a')
+      
+      if( uploaded ){
+        log.debug( "找到已上传文件")
+        await uploaded.click()
+        await page.waitForSelector( '.filemanager button.fp-file-delete')
+        let delbutton = await page.$( '.filemanager button.fp-file-delete')
+        log.debug( "找到删除按钮")
+        await delbutton.click()
+        const confirmButton = await page.$( '.filemanager button.fp-dlg-butconfirm'  )
+        await confirmButton.click()
+        // 延时以免数据没有提交成功
+        await handleDelay(500);
+      }
+      log.debug( "查找上传按钮")
+
+      const addbutton = await page.$('.fp-toolbar .fp-btn-add a')
+
+      await addbutton.click()
+      await page.waitForSelector( '.moodle-dialogue')
+      let nav = await page.$('.fp-repo-area .nav-item:nth-child(2) a')
+      await handleDelay(500);
+      await nav.click()
+      await page.waitForSelector( '.moodle-dialogue input[type=file]')
+
+      let selbutton = await page.$('.moodle-dialogue input[type=file]')
+      log.debug( "开始上传文件", filepath)
+
+      await selbutton.uploadFile(filepath)
+      await handleDelay(500);
+
+      const uploadButton = await page.$('.moodle-dialogue   button.fp-upload-btn')
+      await uploadButton.click()
+
+      await handleDelay(500);
+
+      log.debug("提交文件", filepath)
+      //await handleDelay(1500);
+
+    }else if( editor ){ //label == '在线文本'
       
       // 可能会超时，需要重新加载
       await page.waitForSelector('iframe', {timeout:45000}).catch(async(e)=>{
@@ -517,14 +614,19 @@ class BotPlus {
       // 有的课程的形考，有多个论述题，所以文件名里需要添加lessonId
       let answerText = "";
       let filepath = `./db/subjects/${fullname}_final.txt`
-      if( type == 'xingkaofinal'){
+      if( type == 'xingkaofinal' || type == 'assign'){
+        // docx,ppt,pdf,doc,txt
         filepath = `./db/subjects/${fullname}_${lessonType}_${lessonId}.txt`
+
       } 
       if( fs.existsSync( filepath )){
         answerText = fs.readFileSync(filepath,'utf8')
 
       }else{
         filepath = `./db/subjects/final/${this.couseTitle}.txt`
+        if( keyword && keyword.length>0){
+          filepath = `./db/subjects/final/${keyword}.txt`
+        }
         answerText = fs.readFileSync(filepath,'utf8')
       }
 
@@ -535,89 +637,52 @@ class BotPlus {
       await page.keyboard.press('Delete');
       await textBody.type( answerText )
 
-    }else if( label=="文件提交"){
-      // 提交文件
-
-      await page.waitForSelector('.filemanager .filemanager-container' ).catch(async(e)=>{
-        log.error( " TimeoutError: waiting for selector filemanager", e)
-        await page.reload()
-      }); 
-
-      // 多等一会  failed: timeout 30000ms exceeded
-
-      let fullname = `${this.couseTitle}_${classId}`
-
-      let filepath = `./db/answers/${fullname}/${lessonType}_${lessonId}.txt`
-      if( !fs.existsSync( filepath )){
-        filepath = `./db/answers/${fullname}/${lessonType}_${lessonId}.doc`
-      } 
-      if( !fs.existsSync( filepath )){
-        filepath = `./db/subjects/final/${this.couseTitle}.txt`
-      } 
-      log.debug( "filepath=", filepath)
-      const uploaded = await page.$('.fp-content .fp-file')
-      if( uploaded ){
-        await uploaded.click()
-        await page.waitForSelector( '.filemanager button.fp-file-delete')
-        let delbutton = await page.$( '.filemanager button.fp-file-delete')
-        await delbutton.click()
-        const confirmButton = await page.$( '.filemanager button.fp-dlg-butconfirm'  )
-        await confirmButton.click()
-        // 延时以免数据没有提交成功
-        await handleDelay(300);
-      }
-      const addbutton = await page.$('.fp-toolbar .fp-btn-add a')
-
-      await addbutton.click()
-      await page.waitForSelector( '.moodle-dialogue')
-      let nav = await page.$('.fp-repo-area .nav-item:nth-child(2) a')
-      await nav.click()
-      await page.waitForSelector( '.moodle-dialogue input[type=file]')
-
-      let selbutton = await page.$('.moodle-dialogue input[type=file]')
-
-      await selbutton.uploadFile(filepath)
-      const uploadButton = await page.$('.moodle-dialogue   button.fp-upload-btn')
-      await uploadButton.click()
-
-
-      log.debug("提交文件", filepath)
-      await handleDelay(1500);
-
     }
+    let saveButtonCss = '#id_submitbutton'
 
-    await page.waitForSelector('.form-group input.btn-primary');
-    const saveButton = await page.$('.form-group input.btn-primary')
+    await page.waitForSelector(saveButtonCss);
+    const saveButton = await page.$(saveButtonCss)
     await saveButton.click()
     // 现在这里就直接保存了，需要延时以免数据没有提交成功
-    await handleDelay(300);
+    await handleDelay(800);
 
     // 点击提交按钮
     if( options.submitquiz == 'yes'){
-      log.debug("查找提交按钮")
+      // log.debug("查找保存按钮")
 
-      let submitButtonCss = '.submissionaction:last-child form button.btn-secondary'
-      await page.waitForSelector(submitButtonCss);
-      const submitButton = await page.$(submitButtonCss)
-      await submitButton.click()
-      log.debug("点击提交按钮")
-
+      let submitButtonCss = '#id_submitbutton'
+      // await page.waitForSelector(submitButtonCss);
+      // await handleDelay(500);
+      // const submitButton = await page.$(submitButtonCss)
+      // await submitButton.click();
+      log.debug("点击保存按钮", lessonType)
+ 
       if( lessonType == 'assign'){
-        let confirmButtonCss = '#id_submitbutton'
+        // 保持更改按钮 
+        let confirmButtonCss = '.submissionaction:last-child form button.btn-secondary'
         await page.waitForSelector(confirmButtonCss);
   
+        const confirmButton = await page.$( confirmButtonCss )
+        await confirmButton.click()
+        await handleDelay(800);
+        //await handle503(page);
         let stateButtonCss = '#id_submissionstatement'
-        // 
+        // 确认作业
+        log.debug("开始查找确认按钮")
         const stateButton = await page.$( stateButtonCss )
         if( stateButton ){
           await stateButton.click()
         }
-        const confirmButton = await page.$( confirmButtonCss )
-        await confirmButton.click()
+
+        // 最后提交
+        await page.waitForSelector(submitButtonCss);
+
+        const submitButton = await page.$(submitButtonCss)
+        await submitButton.click()
       }
 
       // 延时以免数据没有提交成功
-      await handleDelay(300);
+      await handleDelay(500);
       log.debug("点击确认按钮")
     }
 
@@ -632,11 +697,12 @@ class BotPlus {
     let lessonId = lesson.id
     let url = lesson.url
     let classId = lesson.classId
-    
-    let page = await driver.get(url)
+    // 即使课程号一致，url 也可能不一致， 需要替换成当前的课程url
+    url = this.fixLessonUrl( this.couseTitle, url)
 
-    await page.waitForSelector( '#newdiscussionform');
-    const [response] = await Promise.all([  page.waitForNavigation( ),  page.click("#newdiscussionform> button[type=submit]") ])
+    let page = await driver.get(url)
+    await page.waitForSelector( "a[href='#collapseAddForm']");
+    await page.click("a[href='#collapseAddForm']") 
 
     await handleDelay(1000);
 
@@ -677,9 +743,10 @@ class BotPlus {
       await page.waitForSelector(submitButtonCss);
       const submitButton = await page.$(submitButtonCss)
       await submitButton.click()
+      console.debug( "点击提交按钮")
       log.debug("点击提交按钮")       
       // 延时以免数据没有提交成功
-      await handleDelay(1000);
+      await handleDelay(2000);
     }
 
   }
@@ -783,10 +850,11 @@ class BotPlus {
       host
     } = CouseUrlMap[couseTitle]
     filter = filter || ''
+    let couseinfo = CouseUrlMap[couseTitle];
+    let cousefile = this.getSubjectDataFilePath( couseinfo )
     let fullname = `${title}_${code}`
-    let filename = `db/subjects/${fullname}.json`
     // 加载课程数据文件
-    this.getLog( couseTitle, { filename } )
+    this.getLog( couseTitle, { filename: cousefile } )
     
 
     let urlbase = `http://${host}/mod/quiz/view.php`
@@ -953,7 +1021,7 @@ class BotPlus {
     const newPagePromise = new Promise(x => browser.once('targetcreated', target => x(target.page()))); 
 
     await links[0].click()
-    
+
     const cousePage = await newPagePromise 
      
     let success = false
@@ -1001,20 +1069,29 @@ console.debug( "prepareForLearn=", CouseUrlMap )
 
   async learnFinal(options) {
 
-    log.log( "============= learnFinal =============")
+    console.debug( "============= learnFinal =============")
     log.log( "this.couseInfo.status", this.couseInfo.status.length)
-
+    let keyword = options.keyword;
     let moduleStatus = this.couseInfo.status
     
       for (let i = 0; i < moduleStatus.length; i++) {
         let lesson = moduleStatus[i];
-        try{
-          if ((lesson.title == '终结性考试' || lesson.title == '大作业')&& lesson.type =='assign') {
+        //log.log( "this.couseInfo", lesson.title, lesson.title.includes( '终结性考试') )
+
+
+        let isvalidtitle =   false
+        if( keyword){
+          isvalidtitle =  lesson.title.includes( keyword )
+        } else{
+          isvalidtitle =  /(终结性考试|大作业|期末考试)/.test(lesson.title) 
+        }
+        //try{
+          if ( isvalidtitle && lesson.type =='assign'  ) {
             await this.goFinal(lesson, options)
           }
-        }catch(e){
-          log.error( `无法学习课程 ${lesson.title} url=${lesson.url} account=${this.username}`,e)
-        }
+        // }catch(e){
+        //   log.error( `无法学习课程 ${lesson.title} url=${lesson.url} account=${this.username}`,e)
+        // }
       }
 
   }
@@ -1059,7 +1136,7 @@ console.debug( "prepareForLearn=", CouseUrlMap )
       let cousePage = await this.driver.get(url)
       let windowTitle = await cousePage.title()
       let snapshot = `./db/log/initdb/${this.couseTitle}.jpg`
-      handleSnapshot( this, cousePage,snapshot)
+      // handleSnapshot( this, cousePage,snapshot)
       log.debug(" tab.title1 ", title, this.couseTitle, typeof(this.couseTitle))
 
       // let bybase = [ '国家开放大学学习指南','思想道德修养与法律基础','马克思主义基本原理概论','毛泽东思想和中国特色社会主义理论体系概论','中国特色社会主义理论体系概论','习近平新时代中国特色社会主义思想', '中国近现代史纲要']
@@ -1117,7 +1194,8 @@ console.debug( "prepareForLearn=", CouseUrlMap )
 
         title = buildCouseTitle( title )
         //log.debug("getCousesLinks couse=", title, title.includes(couseTitle));
-        if (title.includes(couseTitle)) {
+        // 可编程控制器应用, 可编程控制器应用实训
+        if (title.endsWith(couseTitle)) {
           links.push(buttonElement)
         }
       }
@@ -1135,25 +1213,31 @@ console.debug( "prepareForLearn=", CouseUrlMap )
     // 支持的课程
     let links = []
     try{
-      await handleDelay(500);
-      await page.waitForSelector('#zaixuekecheng .media');
-      let div = await page.$('#zaixuekecheng');
-      let couses = await page.$$('#zaixuekecheng .media');
-      //log.debug("getCousesLinks couses=", couseTitle, couses.length);
-      for (let i = 0; i < couses.length; i++) {
-        let couse = couses[i]
-        //let titleElement = await couse.$eval('.media-title', node=> node.innerText );
-        let title =  await couse.$eval('.media-title', node=> node.innerText );
-        let buttonElement = await couse.$('.course-entry button');
-        //let text =  await couse.$eval('.course-entry button', node=>node.innerText );
-        //   title="★中级财务会计（一）"  couseTitle = "中级财务会计（一）"
-        //   "Photoshop图像处理".toLowerCase() => "photoshop图像处理"
-
-        title = buildCouseTitle( title )
-        //log.debug("getCousesLinks couse=", title, title.includes(couseTitle));
-        links.push(title)
-        
+      await handleDelay(1200);
+      let couses = await page.$$('#zaixuekecheng .media')
+      if( couses.length>0){
+        await page.waitForSelector('#zaixuekecheng .media');
+        let div = await page.$('#zaixuekecheng');
+        let couses = await page.$$('#zaixuekecheng .media');
+        //log.debug("getCousesLinks couses=", couseTitle, couses.length);
+        for (let i = 0; i < couses.length; i++) {
+          let couse = couses[i]
+          //let titleElement = await couse.$eval('.media-title', node=> node.innerText );
+          let title =  await couse.$eval('.media-title', node=> node.innerText );
+          let buttonElement = await couse.$('.course-entry button');
+          //let text =  await couse.$eval('.course-entry button', node=>node.innerText );
+          //   title="★中级财务会计（一）"  couseTitle = "中级财务会计（一）"
+          //   "Photoshop图像处理".toLowerCase() => "photoshop图像处理"
+  
+          title = buildCouseTitle( title )
+          //log.debug("getCousesLinks couse=", title, title.includes(couseTitle));
+          links.push(title)
+          
+        }
+      }else{
+        log.warn( '学生没有选课')
       }
+
 
     }catch(e){
       handleBotError( this, e)
@@ -1184,7 +1268,8 @@ console.debug( "prepareForLearn=", CouseUrlMap )
 
   async getCouseJsonPath(couseTitle) {
     let couse = CouseUrlMap[couseTitle]
-    let fullname = `${couse.title}_${couse.code}`
+    
+    let fullname = `${couse.title}_${couse.code}_${couse.host}`
     let dir = './db/subjects'
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir)
@@ -1329,7 +1414,7 @@ console.debug( "prepareForLearn=", CouseUrlMap )
    * @param {*} couseBaseInfo couseTitle, couseCode
    */
   getSubjectDataFilePath( couseBaseInfo ){
-    let couseFullname = `${couseBaseInfo.title}_${couseBaseInfo.code}`
+    let couseFullname = `${couseBaseInfo.title}_${couseBaseInfo.code}_${couseBaseInfo.host}`
     // Error: File or directory 'D:\**\dati\db\subjects\毛泽东思想和中国特色社会主义理论体系概论_5771.json' was not included into executable at compilation stage. Please recompile adding it as asset or script.
     //let subjectfile =  path.join( AppConfig.appPath, `./db/subjects/${couseFullname}.json`)
     let subjectfile =  `./db/subjects/${couseFullname}.json`
@@ -1340,6 +1425,15 @@ console.debug( "prepareForLearn=", CouseUrlMap )
   getCourseInfo(couseTitle){
     let couse = CouseUrlMap[couseTitle]
     return couse
+  }
+
+
+  fixLessonUrl( couseTitle, url ){
+        // 即使课程号一致，url 也可能不一致， 需要替换成当前的课程url
+        let couse = CouseUrlMap[couseTitle]
+        let rex = /[a-z]+\.ouchn\.cn/;
+        url = url.replace( rex, couse.host )
+    return url
   }
 
   /**
@@ -1418,6 +1512,29 @@ function addQuizIntoAnswerFile(lessonquiz, originalQuizArray, fullname, filter )
         fs.writeFileSync(answerjson, JSON.stringify({ answers: answerList}));
         return  answerList  
 }
+
+
+function fromDir(startPath,filter,callback){
+
+    //console.log('Starting from dir '+startPath+'/');
+
+    if (!fs.existsSync(startPath)){
+        console.log("no dir ",startPath);
+        return;
+    }
+
+    var files=fs.readdirSync(startPath);
+    let foundfile = null;
+    for(var i=0;i<files.length;i++){
+        var filename=path.join(startPath,files[i]);
+         //console.debug(filter.test(filename),filename )
+        if (filter.test(filename)) {
+          foundfile = files[i];
+          break;
+        }
+    }
+    return foundfile;
+};
 
 
 module.exports = {
